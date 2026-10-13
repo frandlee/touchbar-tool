@@ -249,6 +249,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate {
     }
     private func applyButtonTitle(_ title: String, to button: NSButton, identifier: NSTouchBarItem.Identifier) {
         button.title = title
+        button.image = ButtonTitleLayout.icon(for: title)
+        button.imagePosition = button.image == nil ? .noImage : .imageOnly
         button.font = .systemFont(ofSize: 13)
         button.cell?.lineBreakMode = .byTruncatingTail
         button.setAccessibilityLabel(title)
