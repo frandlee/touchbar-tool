@@ -70,7 +70,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate {
         } catch { fail("Configuration error: \(error.localizedDescription)"); return }
         guard CTBAvailable() else { fail("Private Touch Bar API unavailable; exiting safely."); return }
         status = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        status.button?.title = "CTB"
+        status.button?.image = ButtonTitleLayout.menuBarIcon
+        status.button?.toolTip = "Touchbar Tool"
+        status.button?.setAccessibilityLabel("Touchbar Tool")
         let menu = NSMenu()
         let toggle = NSMenuItem(title: "启用 Touch Bar", action: #selector(toggleEnabled(_:)), keyEquivalent: "")
         toggle.target = self; toggle.state = .on; menu.addItem(toggle)

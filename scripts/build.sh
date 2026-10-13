@@ -14,8 +14,8 @@ cat > build/TouchbarTool.app/Contents/Info.plist <<'PLIST'
 <key>CFBundleDisplayName</key><string>Touchbar Tool</string>
 <key>CFBundleExecutable</key><string>CodexTouchBar</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleVersion</key><string>12</string>
-<key>CFBundleShortVersionString</key><string>0.8.0</string>
+<key>CFBundleVersion</key><string>13</string>
+<key>CFBundleShortVersionString</key><string>0.8.1</string>
 <key>LSUIElement</key><false/>
 <key>CFBundleIconFile</key><string>AppIcon</string>
 <key>NSHighResolutionCapable</key><true/>

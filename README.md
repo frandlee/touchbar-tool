@@ -1,4 +1,4 @@
-# Touchbar Tool 0.8.0
+# Touchbar Tool 0.8.1
 
 轻量 Swift/AppKit 菜单栏 Touch Bar 工具。在指定应用处于前台时显示五个按钮，切换应用后收起，并保留 Control Strip。目标默认 bundle ID 为 `com.openai.codex`，只能按应用匹配，不能区分应用内的模式。
 
@@ -93,3 +93,8 @@ open build/TouchbarTool.app --args --diagnostics
 显示标题直接支持“中⇄日”等Unicode文字，不再根据“中日翻译”标题自动替换图像。发送文案与显示标题独立，行为不变。
 
 新登录启动项使用--background保持后台启动。已有登录项应先disable再enable更新参数，不终止运行App。默认菜单栏＋Dock模式保留原bundle ID及配置路径，升级前退出并保留个人配置。
+
+
+## 0.8.1 菜单栏图标
+
+菜单栏CTB文字改为带三个按键的单色Touch Bar图标，自动适应浅色/深色，保留工具提示和辅助功能名称，菜单功能及发送行为不变。
