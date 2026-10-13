@@ -152,7 +152,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate {
         if configurationEditor == nil {
             configurationEditor = ConfigurationEditor()
         }
-        configurationEditor?.present(configuration: config) { [weak self] candidate, expected in
+        configurationEditor?.present(configuration: configurationStore.current) { [weak self] candidate, expected in
             guard let self else { return }
             try self.configurationStore.save(candidate, expected: expected) {
                 self.cancelAutoSend("Cancelled: configuration save")
@@ -180,6 +180,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate {
         config = candidate
         configurationRevision += 1
         configurationOutcome = "重新加载成功"
+        update()
+    }
+    private func refreshConfiguredButtons() {
         configurationInfo?.title = config.pasteAuthorized ? (config.shouldAutoSend ? "五按钮：验证粘贴后回车发送" : "五按钮：仅粘贴") : "粘贴：待用户批准（关闭）"
         for (index, identifier) in itemIDs.enumerated() {
             if let item = bar.item(forIdentifier: identifier) as? NSCustomTouchBarItem,
@@ -188,13 +191,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate {
                 button.isEnabled = config.pasteAuthorized
             }
         }
-        update()
     }
     private func fail(_ message: String) {
         fputs(message + "\n", stderr)
         NSApplication.shared.terminate(nil)
     }
     @objc private func update() {
+        let active = configurationStore.current.profile(for: NSWorkspace.shared.frontmostApplication?.bundleIdentifier)
+            ?? configurationStore.current.profiles[0]
+        if config != active {
+            cancelAutoSend("Cancelled: application profile changed")
+            hide()
+            config = active
+        }
+        refreshConfiguredButtons()
         status?.menu?.items.first?.state = enabled ? .on : .off
         let shouldShow = enabled && NSWorkspace.shared.frontmostApplication?.bundleIdentifier == config.targetBundleIdentifier
         if shouldShow && !shown {

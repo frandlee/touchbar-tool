@@ -14,6 +14,34 @@ struct Configuration: Codable, Equatable {
     let pasteAuthorized: Bool
     let autoSend: Bool?
     let sendDelayMilliseconds: Int?
+    let applications: [Configuration]?
+
+    init(schemaVersion: Int, targetBundleIdentifier: String, buttons: [ButtonConfiguration],
+         pasteAuthorized: Bool, autoSend: Bool?, sendDelayMilliseconds: Int?, applications: [Configuration]? = nil) {
+        self.schemaVersion = schemaVersion
+        self.targetBundleIdentifier = targetBundleIdentifier
+        self.buttons = buttons
+        self.pasteAuthorized = pasteAuthorized
+        self.autoSend = autoSend
+        self.sendDelayMilliseconds = sendDelayMilliseconds
+        self.applications = applications
+    }
+    var profiles: [Configuration] {
+        [Configuration(schemaVersion: schemaVersion, targetBundleIdentifier: targetBundleIdentifier,
+            buttons: buttons, pasteAuthorized: pasteAuthorized, autoSend: autoSend,
+            sendDelayMilliseconds: sendDelayMilliseconds)] + (applications ?? [])
+    }
+    func profile(for bundleIdentifier: String?) -> Configuration? {
+        profiles.first { $0.targetBundleIdentifier == bundleIdentifier }
+    }
+    static func combining(_ profiles: [Configuration]) -> Configuration {
+        precondition(!profiles.isEmpty)
+        let first = profiles[0]
+        return Configuration(schemaVersion: first.schemaVersion, targetBundleIdentifier: first.targetBundleIdentifier,
+            buttons: first.buttons, pasteAuthorized: first.pasteAuthorized, autoSend: first.autoSend,
+            sendDelayMilliseconds: first.sendDelayMilliseconds,
+            applications: profiles.count > 1 ? Array(profiles.dropFirst()) : nil)
+    }
     var shouldAutoSend: Bool { autoSend ?? false }
     var sendDelay: TimeInterval { Double(sendDelayMilliseconds ?? 400) / 1000 }
 
@@ -29,6 +57,16 @@ struct Configuration: Codable, Equatable {
         guard buttons.map(\.id) == Self.fixedIDs
         else { throw invalid("必须恰好五个按钮，ID顺序固定为 continue、check、translate、done、merge。") }
         guard (200...1500).contains(sendDelayMilliseconds ?? 400) else { throw invalid("Send delay must be 200...1500 milliseconds.") }
+        if let applications {
+            var identifiers: Set<String> = [targetBundleIdentifier]
+            for application in applications {
+                guard application.applications == nil,
+                      identifiers.insert(application.targetBundleIdentifier).inserted else {
+                    throw invalid("应用不能重复，且不能包含嵌套应用配置。")
+                }
+                try application.validate()
+            }
+        }
         let forbidden = CharacterSet.controlCharacters.union(.newlines)
         for button in buttons {
             guard !button.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,

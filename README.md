@@ -1,4 +1,4 @@
-# Touchbar Tool 0.5.0
+# Touchbar Tool 0.6.0
 
 轻量 Swift/AppKit 菜单栏 Touch Bar 工具。在指定应用处于前台时显示五个按钮，切换应用后收起，并保留 Control Strip。目标默认 bundle ID 为 `com.openai.codex`，只能按应用匹配，不能区分应用内的模式。
 
@@ -21,7 +21,7 @@ codesign --verify --strict build/TouchbarTool.app
 open build/TouchbarTool.app
 ```
 
-输出为`build/TouchbarTool.app`，版本0.5.0（build 7）。内部可执行文件`CodexTouchBar`，bundle ID `local.codex-touchbar.prototype`，使用ad-hoc签名。构建首次从通用示例生成根目录个人配置，仅在运行配置不存在时复制到`build/config.json`，不会覆盖已有运行配置。
+输出为`build/TouchbarTool.app`，版本0.6.0（build 8）。内部可执行文件`CodexTouchBar`，bundle ID `local.codex-touchbar.prototype`，使用ad-hoc签名。构建首次从通用示例生成根目录个人配置，仅在运行配置不存在时复制到`build/config.json`，不会覆盖已有运行配置。
 
 GUI默认读取`build/config.json`；启动时设置`CODEX_TOUCHBAR_CONFIG`可指定其他文件，编辑和重载始终使用该次启动确定的路径。CTB → **重新加载配置** 可加载外部文件修改；失败时保留旧配置。编辑、保存、重载均取消待发送任务，旧任务不会复活。
 
@@ -58,10 +58,17 @@ open build/TouchbarTool.app --args --diagnostics
 
 ## 验证与兼容性
 
-178项检查：41项配置、97项自动发送保护/离屏输入模拟、36项重载及保存保护、4项标题布局。0.5.0构建及严格签名检查通过，表格窗口布局和字段已核实；该版本真实目标发送未重新验收。较早版本自动回车已由用户实机确认，不能视为所有系统和应用兼容保证。
+191项检查：52项配置与应用匹配、97项自动发送保护/离屏输入模拟、38项重载及保存保护、4项标题布局。0.6.0构建及严格签名检查通过，表格窗口布局和字段已核实；该版本真实目标发送未重新验收。较早版本自动回车已由用户实机确认，不能视为所有系统和应用兼容保证。
 
 跨应用Touch Bar依赖私有`presentSystemModalTouchBar:systemTrayItemIdentifier:`和`dismissSystemModalTouchBar:`，旧FunctionBar名称为后备。桥接核对签名并保护Objective-C异常；无法保证硬件显示或防止全部底层崩溃。未修改系统Touch Bar偏好，不申请录屏、输入监控或Apple Events权限。
 
 参考：[NSTouchBar官方文档](https://developer.apple.com/documentation/appkit/nstouchbar)、[MTMR接口用法](https://github.com/Toxblh/MTMR/blob/master/MTMR/TouchBarController.swift)、[EnergyBar接口声明](https://github.com/billziss-gh/EnergyBar/blob/master/src/System/NSTouchBar%2BSystemModal.m)。桥接独立实现，未引入这些实现文件或依赖。
 
 仓库尚未指定LICENSE；公开可见不等于授予开源使用许可。
+
+
+## 多应用配置
+
+编辑窗口顶部可添加已安装应用、选择应用及移除配置；至少保留一个应用。每应用独立保存五个按钮、粘贴开关、自动回车和延迟。新增应用允许粘贴、默认不自动回车，使用“按钮1”至“按钮5”占位标题和文案，按需求编辑后保存。切换应用保留有效草稿，取消关闭不保存。
+
+按前台应用bundle ID匹配配置，切换后更新按钮并取消旧发送任务；未配置应用收起。旧schemaVersion=2文件兼容，新应用存于可选applications数组，重复应用或嵌套配置拒绝。多应用匹配和保存回读已验证；不同应用输入框及自动回车仍需逐应用实机验证，无法验证时仅粘贴。

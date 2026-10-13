@@ -54,3 +54,24 @@ for title in ["", "   ", "x\n", "x\t", "x\u{2028}", String(repeating: "字", cou
 }
 check(accepts { var b = $0["buttons"] as! [[String: Any]]; b[4]["title"] = String(repeating: "字", count: 20); $0["buttons"] = b }, "title length boundary")
 print("PASS: \(checks) multi-button configuration checks")
+
+let second = Configuration(schemaVersion: 2, targetBundleIdentifier: "com.apple.TextEdit",
+    buttons: configuration.buttons.map { ButtonConfiguration(id: $0.id, title: "测试", text: "本地测试") },
+    pasteAuthorized: true, autoSend: false, sendDelayMilliseconds: 600)
+let multi = Configuration.combining([configuration, second])
+try multi.validate()
+check(configuration.profiles.count == 1, "legacy file remains one profile")
+check(multi.profiles.count == 2, "two independent profiles")
+check(multi.profile(for: "com.apple.TextEdit") == second, "matches second application")
+check(multi.profile(for: nil) == nil, "unknown bundle does not match")
+check(multi.profile(for: "com.example.unconfigured") == nil, "unconfigured app hidden")
+check(multi.profile(for: configuration.targetBundleIdentifier)?.buttons == configuration.buttons, "original texts retained")
+check(second.pasteAuthorized && !second.shouldAutoSend, "new app paste only")
+check(multi.profile(for: "com.apple.TextEdit")?.sendDelay == 0.6, "independent delay")
+let decodedMulti = try JSONDecoder().decode(Configuration.self, from: JSONEncoder().encode(multi))
+check(decodedMulti == multi, "multi application roundtrip")
+check((try? Configuration.combining([configuration, configuration]).validate()) == nil, "duplicate applications rejected")
+let nested = Configuration(schemaVersion: 2, targetBundleIdentifier: "com.example.nested", buttons: configuration.buttons,
+    pasteAuthorized: true, autoSend: false, sendDelayMilliseconds: 400, applications: [second])
+check((try? Configuration.combining([configuration, nested]).validate()) == nil, "nested profiles rejected")
+print("PASS: 11 multi-application compatibility and matching checks")

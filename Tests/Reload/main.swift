@@ -95,3 +95,12 @@ do {
     check(store.current == draft, "invalid draft preserves live config")
 }
 print("PASS: table save and stale draft protection")
+
+let another = Configuration(schemaVersion: 2, targetBundleIdentifier: "com.apple.TextEdit", buttons: initial.buttons,
+    pasteAuthorized: true, autoSend: false, sendDelayMilliseconds: 400)
+let multiple = Configuration.combining([draft, another])
+try store.save(multiple, expected: draft) { cancellations += 1 }
+let multipleRead = try ConfigurationStore(url: url)
+check(multipleRead.current == multiple, "multi profile save retains every application")
+check(multipleRead.current.profile(for: "com.apple.TextEdit")?.shouldAutoSend == false, "saved new app does not auto send")
+print("PASS: 2 multi-application persistence checks")

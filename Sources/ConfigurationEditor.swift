@@ -1,4 +1,5 @@
 import AppKit
+import UniformTypeIdentifiers
 
 /// Keeps a draft separate from the live configuration until validation and disk save succeed.
 final class ConfigurationEditor: NSObject, NSWindowDelegate {
@@ -6,6 +7,10 @@ final class ConfigurationEditor: NSObject, NSWindowDelegate {
     private var titles: [NSTextField] = []
     private var texts: [NSTextField] = []
     private var original: Configuration!
+    private var drafts: [Configuration] = []
+    private var selected = 0
+    private let applicationPicker = NSPopUpButton()
+    private let removeApplication = NSButton(title: "移除应用", target: nil, action: nil)
     private var saveAction: ((Configuration, Configuration) throws -> Void)?
     private let paste = NSButton(checkboxWithTitle: "允许粘贴", target: nil, action: nil)
     private let autoSend = NSButton(checkboxWithTitle: "验证粘贴后自动回车", target: nil, action: nil)
@@ -22,20 +27,17 @@ final class ConfigurationEditor: NSObject, NSWindowDelegate {
         original = configuration
         saveAction = save
         if window == nil { createWindow() }
-        for index in titles.indices {
-            titles[index].stringValue = configuration.buttons[index].title
-            texts[index].stringValue = configuration.buttons[index].text
-        }
-        paste.state = configuration.pasteAuthorized ? .on : .off
-        autoSend.state = configuration.shouldAutoSend ? .on : .off
-        delay.stringValue = String(configuration.sendDelayMilliseconds ?? 400)
+        drafts = configuration.profiles
+        selected = 0
+        refreshApplicationPicker()
+        loadSelected()
         feedback.stringValue = ""
         NSApp.activate(ignoringOtherApps: true)
         window?.makeKeyAndOrderFront(nil)
     }
 
     private func createWindow() {
-        let panel = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 420),
+        let panel = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 490),
                              styleMask: [.titled, .closable], backing: .buffered, defer: false)
         panel.title = "编辑配置"
         panel.isReleasedWhenClosed = false
@@ -52,6 +54,14 @@ final class ConfigurationEditor: NSObject, NSWindowDelegate {
             root.trailingAnchor.constraint(equalTo: panel.contentView!.trailingAnchor, constant: -20),
             root.topAnchor.constraint(equalTo: panel.contentView!.topAnchor, constant: 20)
         ])
+        applicationPicker.target = self
+        applicationPicker.action = #selector(selectApplication)
+        applicationPicker.widthAnchor.constraint(equalToConstant: 460).isActive = true
+        let add = NSButton(title: "添加应用…", target: self, action: #selector(addApplication))
+        removeApplication.target = self
+        removeApplication.action = #selector(removeSelectedApplication)
+        root.addArrangedSubview(NSStackView(views: [applicationPicker, add, removeApplication]))
+        root.addArrangedSubview(NSTextField(labelWithString: "新应用默认仅粘贴。未配置的应用不显示按钮。"))
         root.addArrangedSubview(NSTextField(labelWithString: "每行对应一个 Touch Bar 按钮。保存后立即生效。"))
         let grid = NSGridView()
         grid.rowSpacing = 10
@@ -86,20 +96,90 @@ final class ConfigurationEditor: NSObject, NSWindowDelegate {
         window = panel
     }
 
-    @objc private func saveDraft() {
-        // Commit the active field editor before collecting the draft.
-        guard window?.makeFirstResponder(nil) == true else { return }
-        guard let milliseconds = Int(delay.stringValue.trimmingCharacters(in: .whitespaces)) else {
-            feedback.stringValue = "延迟必须是200～1500之间的整数。"
-            return
+    private func refreshApplicationPicker() {
+        applicationPicker.removeAllItems()
+        for profile in drafts {
+            let identifier = profile.targetBundleIdentifier
+            let name = NSWorkspace.shared.urlForApplication(withBundleIdentifier: identifier)
+                .map { $0.deletingPathExtension().lastPathComponent } ?? identifier
+            applicationPicker.addItem(withTitle: "\(name) — \(identifier)")
         }
-        let candidate = Configuration(schemaVersion: original.schemaVersion,
-            targetBundleIdentifier: original.targetBundleIdentifier,
+        applicationPicker.selectItem(at: selected)
+        removeApplication.isEnabled = drafts.count > 1
+    }
+    private func loadSelected() {
+        let profile = drafts[selected]
+        for index in titles.indices {
+            titles[index].stringValue = profile.buttons[index].title
+            texts[index].stringValue = profile.buttons[index].text
+        }
+        paste.state = profile.pasteAuthorized ? .on : .off
+        autoSend.state = profile.shouldAutoSend ? .on : .off
+        delay.stringValue = String(profile.sendDelayMilliseconds ?? 400)
+        feedback.stringValue = ""
+    }
+    private func captureSelected() throws {
+        guard window?.makeFirstResponder(nil) == true,
+              let milliseconds = Int(delay.stringValue.trimmingCharacters(in: .whitespaces)) else {
+            throw NSError(domain: "Configuration", code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "延迟必须是200～1500之间的整数。"])
+        }
+        let candidate = Configuration(schemaVersion: 2,
+            targetBundleIdentifier: drafts[selected].targetBundleIdentifier,
             buttons: Configuration.fixedIDs.indices.map {
                 ButtonConfiguration(id: Configuration.fixedIDs[$0], title: titles[$0].stringValue, text: texts[$0].stringValue)
             }, pasteAuthorized: paste.state == .on, autoSend: autoSend.state == .on,
             sendDelayMilliseconds: milliseconds)
+        try candidate.validate()
+        drafts[selected] = candidate
+    }
+    @objc private func selectApplication() {
+        let next = applicationPicker.indexOfSelectedItem
         do {
+            try captureSelected()
+            selected = next
+            loadSelected()
+        } catch {
+            applicationPicker.selectItem(at: selected)
+            feedback.stringValue = (error as NSError).localizedDescription
+        }
+    }
+    @objc private func addApplication() {
+        do { try captureSelected() }
+        catch { feedback.stringValue = (error as NSError).localizedDescription; return }
+        let chooser = NSOpenPanel()
+        chooser.title = "选择要配置的应用"
+        chooser.directoryURL = URL(fileURLWithPath: "/Applications")
+        chooser.allowedContentTypes = [.application]
+        chooser.allowsMultipleSelection = false
+        chooser.canChooseDirectories = false
+        guard chooser.runModal() == .OK, let url = chooser.url,
+              let identifier = Bundle(url: url)?.bundleIdentifier else { return }
+        if let existing = drafts.firstIndex(where: { $0.targetBundleIdentifier == identifier }) {
+            selected = existing
+        } else {
+            let labels = ["按钮1", "按钮2", "按钮3", "按钮4", "按钮5"]
+            drafts.append(Configuration(schemaVersion: 2, targetBundleIdentifier: identifier,
+                buttons: Configuration.fixedIDs.indices.map {
+                    ButtonConfiguration(id: Configuration.fixedIDs[$0], title: labels[$0], text: labels[$0])
+                }, pasteAuthorized: true, autoSend: false, sendDelayMilliseconds: 400))
+            selected = drafts.count - 1
+        }
+        refreshApplicationPicker()
+        loadSelected()
+    }
+    @objc private func removeSelectedApplication() {
+        guard drafts.count > 1 else { return }
+        drafts.remove(at: selected)
+        selected = min(selected, drafts.count - 1)
+        refreshApplicationPicker()
+        loadSelected()
+        feedback.stringValue = "保存后将移除此应用的配置。"
+    }
+    @objc private func saveDraft() {
+        do {
+            try captureSelected()
+            let candidate = Configuration.combining(drafts)
             try candidate.validate()
             try saveAction?(candidate, original)
             original = candidate
@@ -108,6 +188,5 @@ final class ConfigurationEditor: NSObject, NSWindowDelegate {
             feedback.stringValue = "保存失败：\((error as NSError).localizedDescription)"
         }
     }
-
     @objc private func cancelEditing() { window?.close() }
 }
