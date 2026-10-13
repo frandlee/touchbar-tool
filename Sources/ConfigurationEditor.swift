@@ -69,7 +69,7 @@ final class ConfigurationEditor: NSObject, NSWindowDelegate {
         grid.addRow(with: [NSTextField(labelWithString: "按钮"),
                            NSTextField(labelWithString: "显示标题"),
                            NSTextField(labelWithString: "发送文案")])
-        for (index, id) in Configuration.fixedIDs.enumerated() {
+        for index in Configuration.fixedIDs.indices {
             let title = NSTextField(string: "")
             let text = NSTextField(string: "")
             title.setAccessibilityLabel("第\(index + 1)个按钮显示标题")
@@ -78,7 +78,7 @@ final class ConfigurationEditor: NSObject, NSWindowDelegate {
             text.widthAnchor.constraint(equalToConstant: 480).isActive = true
             titles.append(title)
             texts.append(text)
-            grid.addRow(with: [NSTextField(labelWithString: "\(index + 1). \(id)"), title, text])
+            grid.addRow(with: [NSTextField(labelWithString: "按钮 \(index + 1)"), title, text])
         }
         root.addArrangedSubview(grid)
         let switches = NSStackView(views: [paste, autoSend])
