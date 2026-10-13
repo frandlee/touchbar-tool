@@ -1,4 +1,4 @@
-# Touchbar Tool 0.8.1
+# Touchbar Tool 0.8.2
 
 轻量 Swift/AppKit 菜单栏 Touch Bar 工具。在指定应用处于前台时显示五个按钮，切换应用后收起，并保留 Control Strip。目标默认 bundle ID 为 `com.openai.codex`，只能按应用匹配，不能区分应用内的模式。
 
@@ -21,7 +21,7 @@ codesign --verify --strict build/TouchbarTool.app
 open build/TouchbarTool.app
 ```
 
-输出为`build/TouchbarTool.app`，版本0.7.0（build 12）。内部可执行文件`CodexTouchBar`，bundle ID `local.codex-touchbar.prototype`，使用ad-hoc签名。构建首次从通用示例生成根目录个人配置，仅在运行配置不存在时复制到`build/config.json`，不会覆盖已有运行配置。
+输出为`build/TouchbarTool.app`，版本0.7.0（build 12）。内部可执行文件`CodexTouchBar`，bundle ID `local.codex-touchbar.prototype`，默认使用钥匙串中的唯一有效代码签名证书。构建首次从通用示例生成根目录个人配置，仅在运行配置不存在时复制到`build/config.json`，不会覆盖已有运行配置。
 
 GUI默认读取`build/config.json`；启动时设置`CODEX_TOUCHBAR_CONFIG`可指定其他文件，编辑和重载始终使用该次启动确定的路径。CTB → **重新加载配置** 可加载外部文件修改；失败时保留旧配置。编辑、保存、重载均取消待发送任务，旧任务不会复活。
 
@@ -98,3 +98,10 @@ open build/TouchbarTool.app --args --diagnostics
 ## 0.8.1 菜单栏图标
 
 菜单栏CTB文字改为带三个按键的单色Touch Bar图标，自动适应浅色/深色，保留工具提示和辅助功能名称，菜单功能及发送行为不变。
+
+
+## 0.8.2 稳定签名
+
+构建默认复用钥匙串唯一有效代码签名身份，以稳定的designated requirement识别更新后的App。没有身份或存在多个身份时在编译前停止，请设置TOUCHBAR_SIGNING_IDENTITY为所选有效身份名称/哈希。显式TOUCHBAR_SIGNING_IDENTITY=-可生成ad-hoc构建，但更新可能使隐私授权失配；不会静默回退。签名后自动执行严格验证。
+
+从ad-hoc首次切换证书时可能需要重新授权一次；随后保持同一证书身份及bundle ID更新通常可沿用权限。两份不同二进制的证书签名规则一致已验证，未来真实更新后仍应核实GUI权限。Apple Development用于本机开发，不代表应用已公证或可免提示公开分发；此仓库发布源码，未发布证书或私钥。
