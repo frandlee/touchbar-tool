@@ -1,0 +1,12 @@
+/build/
+/config.json
+/config.local*.json
+.DS_Store
+.env
+.env.*
+*.log
+*.pem
+*.key
+*.p12
+*.pfx
+*.mobileprovision
