@@ -19,7 +19,7 @@ final class IconLibraryWindow: NSObject {
             panel.title = "管理图标"
             panel.isReleasedWhenClosed = false
             panel.center()
-            let note = NSTextField(labelWithString: "所有应用共享图标库。内置图标只读，自定义图标可重命名或移到废纸篓。")
+            let note = NSTextField(labelWithString: "图标库由所有应用共享。拖到配置第一列；自定义图标可重命名或删除。")
             note.frame = NSRect(x: 20, y: 460, width: 610, height: 24)
             panel.contentView!.addSubview(note)
             let scroll = NSScrollView(frame: NSRect(x: 20, y: 90, width: 610, height: 360))
@@ -40,11 +40,13 @@ final class IconLibraryWindow: NSObject {
     private func reload() {
         for view in list.subviews { view.removeFromSuperview() }
         names.removeAll()
-        entries = ButtonIcon.allCases + IconLibrary.icons
+        entries = ButtonIcon.singleCases + IconLibrary.icons
         list.frame = NSRect(x: 0, y: 0, width: 590, height: CGFloat(entries.count * 44))
         for (index, icon) in entries.enumerated() {
             let y = CGFloat(index * 44)
-            let preview = NSImageView(frame: NSRect(x: 4, y: y + 5, width: 76, height: 30))
+            let preview = DraggableIconView(frame: NSRect(x: 4, y: y + 5, width: 76, height: 30))
+            preview.icon = icon
+            preview.toolTip = "拖到配置表格第一列添加图标"
             preview.image = ButtonIconImage.image(for: icon)
             preview.contentTintColor = .labelColor
             preview.imageScaling = .scaleProportionallyDown

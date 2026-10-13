@@ -29,6 +29,45 @@ enum ButtonTitleLayout {
 
 
 enum ButtonIconImage {
+    static func image(for selections: [IconSelection], forPreview: Bool = false) -> NSImage? {
+        guard !selections.isEmpty, selections.count <= 4 else { return nil }
+        let sources = selections.compactMap { image(for: $0.icon) }
+        guard sources.count == selections.count else { return nil }
+        let template = selections.allSatisfy {
+            if case .custom = $0.icon { return false }
+            return $0.color == .automatic
+        }
+        let size = NSSize(width: selections.count * 26 - 6, height: 20)
+        let result = NSImage(size: size, flipped: false) { _ in
+            for (index, source) in sources.enumerated() {
+                let selection = selections[index]
+                let color: NSColor?
+                switch selection.color {
+                case .automatic:
+                    if case .custom = selection.icon { color = nil }
+                    else { color = template ? .black : (forPreview ? .labelColor : .white) }
+                case .blue: color = .systemBlue
+                case .green: color = .systemGreen
+                case .purple: color = .systemPurple
+                case .orange: color = .systemOrange
+                case .teal: color = .systemTeal
+                case .red: color = .systemRed
+                }
+                let layer = NSImage(size: NSSize(width: 20, height: 20))
+                layer.lockFocus()
+                source.draw(in: NSRect(x: 0, y: 0, width: 20, height: 20))
+                if let color {
+                    color.setFill()
+                    NSRect(x: 0, y: 0, width: 20, height: 20).fill(using: .sourceIn)
+                }
+                layer.unlockFocus()
+                layer.draw(in: NSRect(x: index * 26, y: 0, width: 20, height: 20))
+            }
+            return true
+        }
+        result.isTemplate = template
+        return result
+    }
     private static var cache: [ButtonIcon: NSImage] = [:]
     static func image(for icon: ButtonIcon?) -> NSImage? {
         guard let icon else { return nil }

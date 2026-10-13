@@ -10,8 +10,9 @@ final class ConfigurationEditor: NSObject, NSWindowDelegate {
     private var window: NSWindow?
     private var titles: [NSTextField] = []
     var manageIcons: (() -> Void)?
-    private var iconChoices: [ButtonIcon] = []
-    private var iconPickers: [NSPopUpButton] = []
+    private var rowIcons: [[IconSelection]] = []
+    private var dropViews: [ButtonIconDropView] = []
+    private let compositionEditor = IconCompositionEditor()
     private var texts: [NSTextField] = []
     private let grid = ButtonConfigurationGrid()
     private let addButtonControl = NSButton(title: "增加按钮", target: nil, action: nil)
@@ -71,7 +72,7 @@ final class ConfigurationEditor: NSObject, NSWindowDelegate {
         removeApplication.action = #selector(removeSelectedApplication)
         root.addArrangedSubview(NSStackView(views: [applicationPicker, add, removeApplication]))
         root.addArrangedSubview(NSTextField(labelWithString: "新应用默认仅粘贴。未配置的应用不显示按钮。"))
-        root.addArrangedSubview(NSTextField(labelWithString: "每行对应一个 Touch Bar 按钮。保存后立即生效。"))
+        root.addArrangedSubview(NSTextField(labelWithString: "从图标库拖到第一列，或点“编辑组合”。保存后生效。"))
         let scroll = NSScrollView()
         scroll.hasVerticalScroller = true
         scroll.borderType = .bezelBorder
@@ -126,9 +127,8 @@ final class ConfigurationEditor: NSObject, NSWindowDelegate {
         }
         titles.removeAll()
         texts.removeAll()
-        iconPickers.removeAll()
-        iconChoices = ButtonIcon.allCases + IconLibrary.icons
-        for icon in buttons.compactMap(\.icon) where !iconChoices.contains(icon) { iconChoices.append(icon) }
+        dropViews.removeAll()
+        rowIcons = buttons.map(\.effectiveIcons)
         grid.rowSpacing = 10
         grid.columnSpacing = 12
         grid.addRow(with: [NSTextField(labelWithString: "按钮"), NSTextField(labelWithString: "显示标题"),
@@ -144,16 +144,22 @@ final class ConfigurationEditor: NSObject, NSWindowDelegate {
             remove.tag = index
             remove.isEnabled = buttons.count > 1
             remove.setAccessibilityLabel("删除按钮\(index + 1)")
-            let picker = NSPopUpButton()
-            picker.addItem(withTitle: "纯文字")
-            for icon in iconChoices { picker.menu?.addItem(NSMenuItem(title: IconLibrary.label(for: icon), action: nil, keyEquivalent: "")) }
-            picker.selectItem(at: button.icon.flatMap { iconChoices.firstIndex(of: $0) }.map { $0 + 1 } ?? 0)
-            picker.widthAnchor.constraint(equalToConstant: 150).isActive = true
-            picker.setAccessibilityLabel("第\(index + 1)个按钮图标")
-            iconPickers.append(picker)
+            let picker = NSButton(title: "编辑组合…", target: self, action: #selector(editIconComposition(_:)))
+            picker.tag = index
+            picker.widthAnchor.constraint(equalToConstant: 100).isActive = true
+            let drop = ButtonIconDropView(number: index + 1)
+            drop.widthAnchor.constraint(equalToConstant: 100).isActive = true
+            drop.heightAnchor.constraint(equalToConstant: 44).isActive = true
+            drop.selections = rowIcons[index]
+            drop.onDrop = { [weak self] icon in
+                guard let self, self.rowIcons.indices.contains(index), self.rowIcons[index].count < 4 else { return }
+                self.rowIcons[index].append(IconSelection(icon: icon, color: .automatic))
+                self.dropViews[index].selections = self.rowIcons[index]
+            }
+            dropViews.append(drop)
             titles.append(title)
             texts.append(text)
-            grid.addRow(with: [NSTextField(labelWithString: "按钮 \(index + 1)"), title, picker, text, remove])
+            grid.addRow(with: [drop, title, picker, text, remove])
         }
         grid.layoutSubtreeIfNeeded()
         grid.setFrameSize(grid.fittingSize)
@@ -183,7 +189,7 @@ final class ConfigurationEditor: NSObject, NSWindowDelegate {
         guard window?.makeFirstResponder(nil) == true else { return }
         var buttons = drafts[selected].buttons
         for index in buttons.indices where index != sender.tag {
-            buttons[index] = ButtonConfiguration(id: buttons[index].id, title: titles[index].stringValue, text: texts[index].stringValue, icon: selectedIcon(at: index))
+            buttons[index] = ButtonConfiguration(id: buttons[index].id, title: titles[index].stringValue, text: texts[index].stringValue, icons: rowIcons[index])
         }
         buttons.remove(at: sender.tag)
         replaceButtons(buttons)
@@ -192,24 +198,22 @@ final class ConfigurationEditor: NSObject, NSWindowDelegate {
     @objc private func openIconLibrary() { manageIcons?() }
     var usedIcons: Set<ButtonIcon> {
         guard window?.isVisible == true else { return [] }
-        var result = Set(drafts.flatMap { $0.buttons.compactMap(\.icon) })
-        for index in iconPickers.indices { if let icon = selectedIcon(at: index) { result.insert(icon) } }
+        var result = Set(drafts.flatMap { $0.buttons.flatMap { $0.effectiveIcons.map(\.icon) } })
+        for values in rowIcons { result.formUnion(values.map(\.icon)) }
+        result.formUnion(compositionEditor.usedIcons)
         return result
     }
     func refreshIconChoices() {
-        let selected = iconPickers.indices.map { selectedIcon(at: $0) }
-        iconChoices = ButtonIcon.allCases + IconLibrary.icons
-        for icon in selected.compactMap({ $0 }) where !iconChoices.contains(icon) { iconChoices.append(icon) }
-        for (index, picker) in iconPickers.enumerated() {
-            picker.removeAllItems()
-            picker.addItem(withTitle: "纯文字")
-            for icon in iconChoices { picker.menu?.addItem(NSMenuItem(title: IconLibrary.label(for: icon), action: nil, keyEquivalent: "")) }
-            picker.selectItem(at: selected[index].flatMap { iconChoices.firstIndex(of: $0) }.map { $0 + 1 } ?? 0)
-        }
+        for (index, view) in dropViews.enumerated() { view.selections = rowIcons[index] }
     }
-    private func selectedIcon(at index: Int) -> ButtonIcon? {
-        let choice = iconPickers[index].indexOfSelectedItem
-        return choice > 0 ? iconChoices[choice - 1] : nil
+    @objc private func editIconComposition(_ sender: NSButton) {
+        guard let window, rowIcons.indices.contains(sender.tag) else { return }
+        let index = sender.tag
+        compositionEditor.present(on: window, items: rowIcons[index]) { [weak self] values in
+            guard let self, self.rowIcons.indices.contains(index) else { return }
+            self.rowIcons[index] = values
+            self.dropViews[index].selections = values
+        }
     }
     private func captureSelected() throws {
         guard window?.makeFirstResponder(nil) == true,
@@ -220,7 +224,7 @@ final class ConfigurationEditor: NSObject, NSWindowDelegate {
         let candidate = Configuration(schemaVersion: 2,
             targetBundleIdentifier: drafts[selected].targetBundleIdentifier,
             buttons: titles.indices.map {
-                ButtonConfiguration(id: drafts[selected].buttons[$0].id, title: titles[$0].stringValue, text: texts[$0].stringValue, icon: selectedIcon(at: $0))
+                ButtonConfiguration(id: drafts[selected].buttons[$0].id, title: titles[$0].stringValue, text: texts[$0].stringValue, icons: rowIcons[$0])
             }, pasteAuthorized: paste.state == .on, autoSend: autoSend.state == .on,
             sendDelayMilliseconds: milliseconds)
         try candidate.validate()

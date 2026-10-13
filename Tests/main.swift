@@ -99,3 +99,26 @@ for icon in ButtonIcon.allCases {
 }
 check(!accepts { var b = $0["buttons"] as! [[String: Any]]; b[0]["icon"] = "invalid-icon"; $0["buttons"] = b }, "unknown icon rejected")
 print("PASS: 10 icon configuration compatibility checks")
+
+let legacyCombo = ButtonConfiguration(id: "legacy", title: "Legacy", text: "same text", icon: .pushMergeDeploy)
+check(legacyCombo.effectiveIcons.map(\.icon) == [.push, .merge, .deploy], "legacy combo expands without changing behavior")
+let colored = [IconSelection(icon: .deploy, color: .orange), IconSelection(icon: .push, color: .blue)]
+let customCombo = ButtonConfiguration(id: "combo", title: "Action", text: "same text", icons: colored)
+let comboRead = try JSONDecoder().decode(ButtonConfiguration.self, from: JSONEncoder().encode(customCombo))
+check(comboRead.effectiveIcons == colored, "ordered colors survive roundtrip")
+check(comboRead.text == legacyCombo.text, "composition preserves send text")
+let clearCombo = ButtonConfiguration(id: "clear", title: "Clear", text: "text", icon: .pushMergeDeploy, icons: [])
+check(clearCombo.effectiveIcons.isEmpty, "explicit empty list clears legacy image")
+let excessive = Configuration(schemaVersion: 2, targetBundleIdentifier: "com.example.test",
+    buttons: [ButtonConfiguration(id: "many", title: "Many", text: "text", icons: Array(repeating: colored[0], count: 5))],
+    pasteAuthorized: false, autoSend: false, sendDelayMilliseconds: 400)
+check((try? excessive.validate()) == nil, "composition bound enforced")
+print("PASS: 5 ordered/color icon compatibility checks")
+
+let dragPayload = try JSONEncoder().encode(ButtonIcon.push)
+check(IconDropPayload.decode(dragPayload, currentCount: 3, available: ButtonIcon.singleCases) == .push, "serialized library icon accepted by drop receiver")
+check(IconDropPayload.decode(dragPayload, currentCount: 4, available: ButtonIcon.singleCases) == nil, "full combination rejects drop")
+check(IconDropPayload.decode(Data("malformed".utf8), currentCount: 0, available: ButtonIcon.singleCases) == nil, "unrelated pasteboard data rejected")
+let absentCustom = try JSONEncoder().encode(ButtonIcon.custom(UUID().uuidString))
+check(IconDropPayload.decode(absentCustom, currentCount: 0, available: ButtonIcon.singleCases) == nil, "unknown custom icon cannot enter combination")
+print("PASS: 4 drag payload boundary checks")

@@ -4,6 +4,7 @@ enum ButtonIcon: Codable, Hashable, CaseIterable {
     case push, merge, deploy, pushMergeDeploy
     case custom(String)
     static let allCases: [ButtonIcon] = [.push, .merge, .deploy, .pushMergeDeploy]
+    static let singleCases: [ButtonIcon] = [.push, .merge, .deploy]
     var rawValue: String {
         switch self {
         case .push: return "push"
@@ -36,13 +37,39 @@ enum ButtonIcon: Codable, Hashable, CaseIterable {
     }
 }
 
+enum IconColor: String, Codable, CaseIterable {
+    case automatic, blue, green, purple, orange, teal, red
+    var label: String {
+        switch self {
+        case .automatic: return "原色/自动"
+        case .blue: return "蓝色"
+        case .green: return "绿色"
+        case .purple: return "紫色"
+        case .orange: return "橙色"
+        case .teal: return "青色"
+        case .red: return "红色"
+        }
+    }
+}
+struct IconSelection: Codable, Equatable {
+    let icon: ButtonIcon
+    let color: IconColor
+}
+
 struct ButtonConfiguration: Codable, Equatable {
     let id: String
     let title: String
     let text: String
     let icon: ButtonIcon?
-    init(id: String, title: String, text: String, icon: ButtonIcon? = nil) {
-        self.id = id; self.title = title; self.text = text; self.icon = icon
+    let icons: [IconSelection]?
+    var effectiveIcons: [IconSelection] {
+        if let icons { return icons }
+        guard let icon else { return [] }
+        let values: [ButtonIcon] = icon == .pushMergeDeploy ? [.push, .merge, .deploy] : [icon]
+        return values.map { IconSelection(icon: $0, color: .automatic) }
+    }
+    init(id: String, title: String, text: String, icon: ButtonIcon? = nil, icons: [IconSelection]? = nil) {
+        self.id = id; self.title = title; self.text = text; self.icon = icon; self.icons = icons
     }
 }
 
@@ -113,6 +140,16 @@ struct Configuration: Codable, Equatable {
         }
         let forbidden = CharacterSet.controlCharacters.union(.newlines)
         for button in buttons {
+            guard button.effectiveIcons.count <= 4,
+                  !button.effectiveIcons.contains(where: { $0.icon == .pushMergeDeploy }) else {
+                throw invalid("每个按钮最多组合4个独立图标。")
+            }
+            for selection in button.effectiveIcons {
+                if case .custom(let id) = selection.icon, UUID(uuidString: id) == nil {
+                    throw invalid("Invalid custom icon identifier.")
+                }
+            }
+
             if case .custom(let id) = button.icon, UUID(uuidString: id) == nil {
                 throw invalid("Invalid custom icon identifier.")
             }
@@ -125,5 +162,15 @@ struct Configuration: Codable, Equatable {
                   !button.text.unicodeScalars.contains(where: { forbidden.contains($0) })
             else { throw invalid("Invalid text for \(button.id): blank, longer than 2000 characters, or contains control/newline characters.") }
         }
+    }
+}
+
+
+enum IconDropPayload {
+    static func decode(_ data: Data?, currentCount: Int, available: [ButtonIcon]) -> ButtonIcon? {
+        guard currentCount < 4, let data,
+              let icon = try? JSONDecoder().decode(ButtonIcon.self, from: data),
+              available.contains(icon) else { return nil }
+        return icon
     }
 }

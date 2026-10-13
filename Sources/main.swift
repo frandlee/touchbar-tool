@@ -209,7 +209,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate {
         cancelAutoSend("Cancelled: manage icons")
         iconLibraryWindow.usedIcons = { [weak self] in
             guard let self else { return [] }
-            return Set(self.configurationStore.current.profiles.flatMap { $0.buttons.compactMap(\.icon) })
+            return Set(self.configurationStore.current.profiles.flatMap { $0.buttons.flatMap { $0.effectiveIcons.map(\.icon) } })
                 .union(self.configurationEditor?.usedIcons ?? [])
         }
         iconLibraryWindow.didChange = { [weak self] in self?.configurationEditor?.refreshIconChoices() }
@@ -240,7 +240,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate {
         for (index, identifier) in itemIDs.enumerated() {
             if let item = bar.item(forIdentifier: identifier) as? NSCustomTouchBarItem,
                let button = item.view as? NSButton {
-                applyButtonTitle(config.buttons[index].title, icon: config.buttons[index].icon, to: button, identifier: identifier)
+                applyButtonTitle(config.buttons[index].title, icons: config.buttons[index].effectiveIcons, to: button, identifier: identifier)
                 button.isEnabled = config.pasteAuthorized
             }
         }
@@ -296,14 +296,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate {
         let item = NSCustomTouchBarItem(identifier: identifier)
         let button = NSButton(title: config.buttons[index].title, target: self, action: #selector(pasteButton(_:)))
         button.tag = index
-        applyButtonTitle(config.buttons[index].title, icon: config.buttons[index].icon, to: button, identifier: identifier)
+        applyButtonTitle(config.buttons[index].title, icons: config.buttons[index].effectiveIcons, to: button, identifier: identifier)
         button.isEnabled = config.pasteAuthorized
         item.view = button
         return item
     }
-    private func applyButtonTitle(_ title: String, icon: ButtonIcon?, to button: NSButton, identifier: NSTouchBarItem.Identifier) {
+    private func applyButtonTitle(_ title: String, icons: [IconSelection], to button: NSButton, identifier: NSTouchBarItem.Identifier) {
         button.title = title
-        button.image = ButtonIconImage.image(for: icon)
+        button.image = ButtonIconImage.image(for: icons)
         button.imagePosition = button.image == nil ? .noImage : .imageOnly
         button.font = .systemFont(ofSize: 13)
         button.cell?.lineBreakMode = .byTruncatingTail
