@@ -1,11 +1,17 @@
 import AppKit
 import UniformTypeIdentifiers
 
+private final class ButtonConfigurationGrid: NSGridView {
+    override var isFlipped: Bool { true }
+}
+
 /// Keeps a draft separate from the live configuration until validation and disk save succeed.
 final class ConfigurationEditor: NSObject, NSWindowDelegate {
     private var window: NSWindow?
     private var titles: [NSTextField] = []
     private var texts: [NSTextField] = []
+    private let grid = ButtonConfigurationGrid()
+    private let addButtonControl = NSButton(title: "增加按钮", target: nil, action: nil)
     private var original: Configuration!
     private var drafts: [Configuration] = []
     private var selected = 0
@@ -37,7 +43,7 @@ final class ConfigurationEditor: NSObject, NSWindowDelegate {
     }
 
     private func createWindow() {
-        let panel = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 490),
+        let panel = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 900, height: 580),
                              styleMask: [.titled, .closable], backing: .buffered, defer: false)
         panel.title = "编辑配置"
         panel.isReleasedWhenClosed = false
@@ -63,24 +69,16 @@ final class ConfigurationEditor: NSObject, NSWindowDelegate {
         root.addArrangedSubview(NSStackView(views: [applicationPicker, add, removeApplication]))
         root.addArrangedSubview(NSTextField(labelWithString: "新应用默认仅粘贴。未配置的应用不显示按钮。"))
         root.addArrangedSubview(NSTextField(labelWithString: "每行对应一个 Touch Bar 按钮。保存后立即生效。"))
-        let grid = NSGridView()
-        grid.rowSpacing = 10
-        grid.columnSpacing = 12
-        grid.addRow(with: [NSTextField(labelWithString: "按钮"),
-                           NSTextField(labelWithString: "显示标题"),
-                           NSTextField(labelWithString: "发送文案")])
-        for index in Configuration.fixedIDs.indices {
-            let title = NSTextField(string: "")
-            let text = NSTextField(string: "")
-            title.setAccessibilityLabel("第\(index + 1)个按钮显示标题")
-            text.setAccessibilityLabel("第\(index + 1)个按钮发送文案")
-            title.widthAnchor.constraint(equalToConstant: 150).isActive = true
-            text.widthAnchor.constraint(equalToConstant: 480).isActive = true
-            titles.append(title)
-            texts.append(text)
-            grid.addRow(with: [NSTextField(labelWithString: "按钮 \(index + 1)"), title, text])
-        }
-        root.addArrangedSubview(grid)
+        let scroll = NSScrollView()
+        scroll.hasVerticalScroller = true
+        scroll.borderType = .bezelBorder
+        scroll.documentView = grid
+        scroll.widthAnchor.constraint(equalToConstant: 860).isActive = true
+        scroll.heightAnchor.constraint(equalToConstant: 260).isActive = true
+        root.addArrangedSubview(scroll)
+        addButtonControl.target = self
+        addButtonControl.action = #selector(addButton)
+        root.addArrangedSubview(addButtonControl)
         let switches = NSStackView(views: [paste, autoSend])
         switches.spacing = 24
         root.addArrangedSubview(switches)
@@ -109,14 +107,73 @@ final class ConfigurationEditor: NSObject, NSWindowDelegate {
     }
     private func loadSelected() {
         let profile = drafts[selected]
-        for index in titles.indices {
-            titles[index].stringValue = profile.buttons[index].title
-            texts[index].stringValue = profile.buttons[index].text
-        }
+        rebuildRows(profile.buttons)
         paste.state = profile.pasteAuthorized ? .on : .off
         autoSend.state = profile.shouldAutoSend ? .on : .off
         delay.stringValue = String(profile.sendDelayMilliseconds ?? 400)
         feedback.stringValue = ""
+    }
+    private func rebuildRows(_ buttons: [ButtonConfiguration]) {
+        while grid.numberOfRows > 0 {
+            for column in 0..<grid.numberOfColumns {
+                grid.cell(atColumnIndex: column, rowIndex: 0).contentView?.removeFromSuperview()
+            }
+            grid.removeRow(at: 0)
+        }
+        titles.removeAll()
+        texts.removeAll()
+        grid.rowSpacing = 10
+        grid.columnSpacing = 12
+        grid.addRow(with: [NSTextField(labelWithString: "按钮"), NSTextField(labelWithString: "显示标题"),
+                          NSTextField(labelWithString: "发送文案"), NSTextField(labelWithString: "操作")])
+        for (index, button) in buttons.enumerated() {
+            let title = NSTextField(string: button.title)
+            let text = NSTextField(string: button.text)
+            title.setAccessibilityLabel("第\(index + 1)个按钮显示标题")
+            text.setAccessibilityLabel("第\(index + 1)个按钮发送文案")
+            title.widthAnchor.constraint(equalToConstant: 150).isActive = true
+            text.widthAnchor.constraint(equalToConstant: 480).isActive = true
+            let remove = NSButton(title: "删除", target: self, action: #selector(removeButton(_:)))
+            remove.tag = index
+            remove.isEnabled = buttons.count > 1
+            remove.setAccessibilityLabel("删除按钮\(index + 1)")
+            titles.append(title)
+            texts.append(text)
+            grid.addRow(with: [NSTextField(labelWithString: "按钮 \(index + 1)"), title, text, remove])
+        }
+        grid.layoutSubtreeIfNeeded()
+        grid.setFrameSize(grid.fittingSize)
+        addButtonControl.isEnabled = buttons.count < Configuration.maximumButtons
+    }
+    private func replaceButtons(_ buttons: [ButtonConfiguration]) {
+        let old = drafts[selected]
+        drafts[selected] = Configuration(schemaVersion: old.schemaVersion, targetBundleIdentifier: old.targetBundleIdentifier,
+            buttons: buttons, pasteAuthorized: old.pasteAuthorized, autoSend: old.autoSend,
+            sendDelayMilliseconds: old.sendDelayMilliseconds)
+        rebuildRows(buttons)
+    }
+    @objc private func addButton() {
+        do {
+            try captureSelected()
+            var buttons = drafts[selected].buttons
+            guard buttons.count < Configuration.maximumButtons else { return }
+            let label = "按钮\(buttons.count + 1)"
+            buttons.append(ButtonConfiguration(id: UUID().uuidString, title: label, text: label))
+            replaceButtons(buttons)
+            feedback.stringValue = "保存后生效。"
+        } catch { feedback.stringValue = (error as NSError).localizedDescription }
+    }
+    @objc private func removeButton(_ sender: NSButton) {
+        guard drafts[selected].buttons.count > 1, drafts[selected].buttons.indices.contains(sender.tag) else { return }
+        // Allow removal of an invalid row while preserving edits in every retained row.
+        guard window?.makeFirstResponder(nil) == true else { return }
+        var buttons = drafts[selected].buttons
+        for index in buttons.indices where index != sender.tag {
+            buttons[index] = ButtonConfiguration(id: buttons[index].id, title: titles[index].stringValue, text: texts[index].stringValue)
+        }
+        buttons.remove(at: sender.tag)
+        replaceButtons(buttons)
+        feedback.stringValue = "保存后生效。"
     }
     private func captureSelected() throws {
         guard window?.makeFirstResponder(nil) == true,
@@ -126,8 +183,8 @@ final class ConfigurationEditor: NSObject, NSWindowDelegate {
         }
         let candidate = Configuration(schemaVersion: 2,
             targetBundleIdentifier: drafts[selected].targetBundleIdentifier,
-            buttons: Configuration.fixedIDs.indices.map {
-                ButtonConfiguration(id: Configuration.fixedIDs[$0], title: titles[$0].stringValue, text: texts[$0].stringValue)
+            buttons: titles.indices.map {
+                ButtonConfiguration(id: drafts[selected].buttons[$0].id, title: titles[$0].stringValue, text: texts[$0].stringValue)
             }, pasteAuthorized: paste.state == .on, autoSend: autoSend.state == .on,
             sendDelayMilliseconds: milliseconds)
         try candidate.validate()

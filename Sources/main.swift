@@ -24,8 +24,8 @@ if CommandLine.arguments.contains("--probe") {
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate {
     private var status: NSStatusItem!
-    private let bar = NSTouchBar()
-    private let itemIDs = Configuration.fixedIDs.map { NSTouchBarItem.Identifier("local.codex-touchbar." + $0) }
+    private var bar = NSTouchBar()
+    private var itemIDs: [NSTouchBarItem.Identifier] = []
     private var titleWidths: [NSTouchBarItem.Identifier: NSLayoutConstraint] = [:]
     private var config: Configuration!
     private var configurationStore: ConfigurationStore!
@@ -74,7 +74,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate {
         let menu = NSMenu()
         let toggle = NSMenuItem(title: "启用 Touch Bar", action: #selector(toggleEnabled(_:)), keyEquivalent: "")
         toggle.target = self; toggle.state = .on; menu.addItem(toggle)
-        let info = NSMenuItem(title: config.pasteAuthorized ? (config.shouldAutoSend ? "五按钮：验证粘贴后回车发送" : "五按钮：仅粘贴") : "粘贴：待用户批准（关闭）", action: nil, keyEquivalent: "")
+        let info = NSMenuItem(title: config.pasteAuthorized ? (config.shouldAutoSend ? "按钮：验证粘贴后回车发送" : "按钮：仅粘贴") : "粘贴：待用户批准（关闭）", action: nil, keyEquivalent: "")
         menu.addItem(info); configurationInfo = info
         let edit = NSMenuItem(title: "编辑配置", action: #selector(editConfiguration), keyEquivalent: "")
         edit.target = self; menu.addItem(edit)
@@ -177,13 +177,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate {
         }
     }
     private func applyConfiguration(_ candidate: Configuration) {
-        config = candidate
         configurationRevision += 1
         configurationOutcome = "重新加载成功"
         update()
     }
     private func refreshConfiguredButtons() {
-        configurationInfo?.title = config.pasteAuthorized ? (config.shouldAutoSend ? "五按钮：验证粘贴后回车发送" : "五按钮：仅粘贴") : "粘贴：待用户批准（关闭）"
+        configurationInfo?.title = config.pasteAuthorized ? (config.shouldAutoSend ? "按钮：验证粘贴后回车发送" : "按钮：仅粘贴") : "粘贴：待用户批准（关闭）"
         for (index, identifier) in itemIDs.enumerated() {
             if let item = bar.item(forIdentifier: identifier) as? NSCustomTouchBarItem,
                let button = item.view as? NSButton {
@@ -199,10 +198,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate {
     @objc private func update() {
         let active = configurationStore.current.profile(for: NSWorkspace.shared.frontmostApplication?.bundleIdentifier)
             ?? configurationStore.current.profiles[0]
-        if config != active {
+        if config != active || itemIDs.count != active.buttons.count {
             cancelAutoSend("Cancelled: application profile changed")
             hide()
             config = active
+            // A fresh bar prevents cached buttons retaining an obsolete index after removal.
+            bar = NSTouchBar()
+            titleWidths.removeAll()
+            itemIDs = active.buttons.map { NSTouchBarItem.Identifier("local.codex-touchbar." + $0.id) }
+            bar.delegate = self
+            bar.defaultItemIdentifiers = itemIDs
         }
         refreshConfiguredButtons()
         status?.menu?.items.first?.state = enabled ? .on : .off
@@ -233,7 +238,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate {
         if shown { _ = CTBDismiss(bar) }
     }
     func touchBar(_ touchBar: NSTouchBar, makeItemForIdentifier identifier: NSTouchBarItem.Identifier) -> NSTouchBarItem? {
-        guard let index = itemIDs.firstIndex(of: identifier) else { return nil }
+        guard let index = itemIDs.firstIndex(of: identifier), config.buttons.indices.contains(index) else { return nil }
         let item = NSCustomTouchBarItem(identifier: identifier)
         let button = NSButton(title: config.buttons[index].title, target: self, action: #selector(pasteButton(_:)))
         button.tag = index

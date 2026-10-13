@@ -7,6 +7,7 @@ struct ButtonConfiguration: Codable, Equatable {
 }
 
 struct Configuration: Codable, Equatable {
+    static let maximumButtons = 20
     static let fixedIDs = ["continue", "check", "translate", "done", "merge"]
     let schemaVersion: Int
     let targetBundleIdentifier: String
@@ -54,8 +55,11 @@ struct Configuration: Codable, Equatable {
         guard !targetBundleIdentifier.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               !targetBundleIdentifier.unicodeScalars.contains(where: { CharacterSet.whitespacesAndNewlines.contains($0) })
         else { throw invalid("Target bundle identifier must not be empty or contain whitespace.") }
-        guard buttons.map(\.id) == Self.fixedIDs
-        else { throw invalid("必须恰好五个按钮，ID顺序固定为 continue、check、translate、done、merge。") }
+        guard (1...Self.maximumButtons).contains(buttons.count),
+              Set(buttons.map(\.id)).count == buttons.count,
+              buttons.allSatisfy({ !$0.id.isEmpty && $0.id.count <= 80 &&
+                $0.id.unicodeScalars.allSatisfy { CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "_-.")).contains($0) } })
+        else { throw invalid("每个应用需有1～20个按钮，内部ID必须有效且不能重复。") }
         guard (200...1500).contains(sendDelayMilliseconds ?? 400) else { throw invalid("Send delay must be 200...1500 milliseconds.") }
         if let applications {
             var identifiers: Set<String> = [targetBundleIdentifier]

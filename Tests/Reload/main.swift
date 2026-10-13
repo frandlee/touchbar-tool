@@ -104,3 +104,11 @@ let multipleRead = try ConfigurationStore(url: url)
 check(multipleRead.current == multiple, "multi profile save retains every application")
 check(multipleRead.current.profile(for: "com.apple.TextEdit")?.shouldAutoSend == false, "saved new app does not auto send")
 print("PASS: 2 multi-application persistence checks")
+
+let reduced = Configuration(schemaVersion: 2, targetBundleIdentifier: another.targetBundleIdentifier,
+    buttons: Array(another.buttons.prefix(1)), pasteAuthorized: true, autoSend: false, sendDelayMilliseconds: 400)
+let resized = Configuration.combining([draft, reduced])
+try store.save(resized, expected: multiple) { cancellations += 1 }
+let resizedRead = try ConfigurationStore(url: url)
+check(resizedRead.current.profiles.map { $0.buttons.count } == [5, 1], "independent resized counts persisted")
+print("PASS: variable button count save")
