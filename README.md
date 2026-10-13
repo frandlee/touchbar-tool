@@ -1,88 +1,67 @@
-# Touchbar Tool
+# Touchbar Tool 0.5.0
 
-轻量 Swift/AppKit 菜单栏工具，在指定应用处于前台时显示自定义 Touch Bar 按钮，离开时收起。当前版本 0.2.0 针对 ChatGPT.app（bundle ID `com.openai.codex`）提供五个按钮：
+轻量 Swift/AppKit 菜单栏 Touch Bar 工具。在指定应用处于前台时显示五个按钮，切换应用后收起，并保留 Control Strip。目标默认 bundle ID 为 `com.openai.codex`，只能按应用匹配，不能区分应用内的模式。
 
-| 顺序 | 按钮 | 默认粘贴文本 |
-|---|---|---|
-| 1 | 继续 | 继续 |
-| 2 | 查问题 | 检查当前问题，说明原因和建议的最小改动。 |
-| 3 | 中日翻译 | 请将下面内容做中日互译，表达自然、简短： |
-| 4 | DONE | DONE |
-| 5 | 合并 | 合并 |
+## 配置表格
 
-所有按钮只粘贴文字，**不按回车、不发送消息、不执行 Git 合并**。目标判断以应用 bundle ID 为单位，不能识别应用内部的 Codex 模式。菜单栏 `CTB` 提供禁用和退出。没有登录自动启动、后台服务或网络请求。
+CTB → **编辑配置** 打开应用内表格，每行编辑一个按钮的显示标题和发送文案。可设置允许粘贴、验证后自动回车及回车延迟，点击 **保存并生效** 即时更新。取消关闭窗口不保存；重复打开已显示窗口保留草稿。外部文件已变化时拒绝覆盖，请关闭编辑窗口、重新加载后再编辑。
+
+五个按钮ID及顺序固定：`continue, check, translate, done, merge`。标题为1～20个字符，发送文案最多2000字符；都不能仅空白或含换行、控制字符。自动回车延迟为200～1500毫秒，默认400。
+
+底层保存为JSON，日常使用无需手工编辑。`config.example.json`是通用安全示例，粘贴和自动回车默认关闭。个人配置、运行日志和构建目录不进入仓库。
 
 ## 构建与运行
 
-需要带 Touch Bar 的 Mac、Apple Command Line Tools（Swift/Clang）以及 macOS GUI 会话。无第三方构建依赖或付费软件。
+需要macOS和Apple Command Line Tools，无第三方构建依赖。使用Swift 5语言模式，链接AppKit/ApplicationServices。
 
 ```sh
-git clone https://github.com/frandlee/touchbar-tool.git
-cd touchbar-tool
 ./scripts/build.sh
 ./scripts/test.sh
 codesign --verify --strict build/TouchbarTool.app
 open build/TouchbarTool.app
 ```
 
-构建输出 `build/TouchbarTool.app`，使用本地 ad-hoc 签名。没有开发者证书或公证发行包。一次只运行一个实例，更新前先从 CTB 菜单退出旧实例。
+输出为`build/TouchbarTool.app`，版本0.5.0（build 7）。内部可执行文件`CodexTouchBar`，bundle ID `local.codex-touchbar.prototype`，使用ad-hoc签名。构建首次从通用示例生成根目录个人配置，仅在运行配置不存在时复制到`build/config.json`，不会覆盖已有运行配置。
 
-## 配置
+GUI默认读取`build/config.json`；启动时设置`CODEX_TOUCHBAR_CONFIG`可指定其他文件，编辑和重载始终使用该次启动确定的路径。CTB → **重新加载配置** 可加载外部文件修改；失败时保留旧配置。编辑、保存、重载均取消待发送任务，旧任务不会复活。
 
-`config.example.json` 是通用模板，默认 `pasteAuthorized=false`。首次构建自动复制为本地 `config.json`，并将其复制到 App 同级的 `build/config.json`；两个本地配置均不提交。
+更新正在运行的App前应先退出并备份个人配置和旧App。重签可能使辅助功能授权失配，即使系统开关仍开启，也应检查新版GUI诊断；需要时经用户批准重新添加同一构建，不重置其他App权限。
 
-编辑 `config.json` 后，可直接复制到 `build/config.json` 并重启 App，无需重新编译。配置在启动时读取。直接运行可执行文件时，可用环境变量 `CODEX_TOUCHBAR_CONFIG` 指定配置路径。
+## 粘贴与自动回车
 
-- `schemaVersion` 必须为 `2`。
-- `targetBundleIdentifier` 默认 `com.openai.codex`。其他应用适配尚未验证。
-- 五按钮的 ID、标签和顺序固定为示例中的值；各项 `text` 可编辑。
-- 文本最多 2000 字符，不允许空白、控制字符或换行（含 Unicode 行/段分隔符）。
-- 缺失、重复或未知按钮，错误顺序、字段类型、schema 或损坏 JSON 均拒绝启动。
-- 了解并批准 App 的辅助功能访问用途后，才将本地 `pasteAuthorized` 改为 `true`；同时需要系统授权。配置开关本身不会授予权限。
+启用粘贴后按钮向同一目标PID发送⌘V，会覆盖剪贴板，不读取或恢复原剪贴板。自动回车还要求同一前台PID、普通输入框、辅助功能及事件发送权限、焦点观察、光标范围和刚插入片段验证全部通过。拒绝密码输入框，不读取整个聊天输入框，不保存聊天正文。
 
-## 权限与安全行为
+连续两次验证通过并达到延迟后才发送一次Return；应用/输入框切换、剪贴板变化、禁用、睡眠、权限丢失或超时会取消。忽略同一输入框的重复焦点通知，切回不会恢复旧任务。无法验证时安全回退为仅粘贴，不盲发Return。最终检查和系统事件仍存在极短竞态，目标快捷键行为及其他应用未全面验证。
 
-App 需要 Accessibility/辅助功能授权，用于在按钮点击时检查已聚焦输入框的类型，并向同一前台进程发送 ⌘V。macOS 27 将该设置页命名为 **Device Control and Data Access**；见 [权限名称说明](https://support.symless.com/hc/en-us/articles/35743428145169-Troubleshooting-the-macOS-Device-Control-and-Data-Access-or-Accessibility-permission)。系统身份验证应由使用者本人完成。
+按钮只是插入和可选发送配置文案，不直接执行Git或部署API；目标应用可能根据文案执行任务。不要使用“合并”等有后果指令做发送验收。
 
-程序不主动弹权限申请、不录屏、不监听键盘、不使用 Apple Events 自动化，也不改变系统安全设置。缺少 AX 或事件发送许可时不会粘贴。不要为了兼容性额外授予权限或放宽系统安全限制。
+## 登录启动及诊断
 
-粘贴前检查目标前台 bundle ID、焦点 TextField/TextArea 类型并拒绝 SecureTextField；不读取输入内容。发送前再次检查前台 PID，有 0.6 秒防重复触发。仅生成 ⌘V 的按下/抬起事件。Clipboard 原内容会被配置文本覆盖，程序不读取、保存或恢复原剪贴板。
-
-焦点的瞬间变化、目标应用自定义处理 ⌘V 的行为以及未暴露标准辅助功能类型的输入框无法完全保证。辅助功能权限本身具有广泛能力，应只对信任的构建授予。
-
-本地 ad-hoc 重签可能使旧系统授权失配，即使设置开关仍开启。只刷新本 App 的同一 Accessibility 授权并重启以核实实际状态，不重置其他应用权限。
-
-内部 bundle ID `local.codex-touchbar.prototype`、可执行文件名 `CodexTouchBar` 及 Touch Bar 项标识为兼容既有原型而保留；产品名称为 Touchbar Tool。
-
-## 私有 API 与兼容性
-
-公共 [NSTouchBar](https://developer.apple.com/documentation/appkit/nstouchbar) 仅服务本应用。跨应用展示依赖私有 class methods：
-
-- `presentSystemModalTouchBar:systemTrayItemIdentifier:`
-- `dismissSystemModalTouchBar:`
-
-旧 FunctionBar 名称作为后备。调用前核对方法存在性、参数数量、对象类型和 void 返回值，并保护 Objective-C 异常；缺失、不匹配或抛异常时退出。不能防止所有底层崩溃。接口返回 void，调用成功不等于硬件实际显示。
-
-使用保留 Control Strip 的两参数展示路径，不调用隐藏 Control Strip 的接口，不加入系统托盘项或修改系统 Touch Bar 偏好。参考 [MTMR 调用方式](https://github.com/Toxblh/MTMR/blob/master/MTMR/TouchBarController.swift) 和 [EnergyBar API 声明](https://github.com/billziss-gh/EnergyBar/blob/master/src/System/NSTouchBar%2BSystemModal.m)；桥接与权限控制独立实现，没有引入这些项目的实现文件或依赖。
-
-曾在 Apple Silicon Touch Bar Mac、macOS 27.0.1 验证五按钮文字、无自动发送、Control Strip 保留及切换应用自动收起。其他系统版本、硬件和目标应用尚未覆盖；私有 API 没有兼容承诺。
-
-## 诊断与测试
+登录启动是可选的当前用户LaunchAgent，仅Aqua会话，RunAtLoad，无KeepAlive。手动退出后不会立即拉起。
 
 ```sh
+./scripts/login-start.sh status
+./scripts/login-start.sh enable
+./scripts/login-start.sh disable
+```
+
+启用拒绝覆盖已有启动项；停用不终止已运行App。移动App前需停用，再按新路径启用。下一次自然登录自动启动尚未实际观察。
+
+```sh
+build/TouchbarTool.app/Contents/MacOS/CodexTouchBar --status
 build/TouchbarTool.app/Contents/MacOS/CodexTouchBar --probe
 build/TouchbarTool.app/Contents/MacOS/CodexTouchBar --permissions
 open build/TouchbarTool.app --args --diagnostics
 ```
 
-`--probe` 和 `--permissions` 在创建 NSApplication 前退出，不展示 Touch Bar、不读取目标 UI、不请求权限。命令行进程的 TCC 身份可能与 GUI 不同，以 GUI 实例实际状态为准。
+`--status`只读保存的无正文运行状态；`--probe`和`--permissions`不展示Touch Bar、不请求权限、不访问目标UI。CLI与GUI权限身份可能不同，实际授权以GUI实例为准。
 
-可选诊断窗口显示本 App 的权限、配置、前台 bundle ID 和启用状态。其测试粘贴按钮仅在目标配置是原型自身时有效，不会对外部应用触发；关闭窗口不会退出菜单栏程序。无窗口菜单栏 App 的自动化界面读取可能超时，诊断窗口可帮助观察。
+## 验证与兼容性
 
-30 项配置测试覆盖固定顺序和默认文字、可编辑文本、长度边界、换行/控制字符、缺失/重复按钮、错误类型及损坏 JSON；测试不对其他应用发送事件。
+178项检查：41项配置、97项自动发送保护/离屏输入模拟、36项重载及保存保护、4项标题布局。0.5.0构建及严格签名检查通过，表格窗口布局和字段已核实；该版本真实目标发送未重新验收。较早版本自动回车已由用户实机确认，不能视为所有系统和应用兼容保证。
 
-手动验收：在目标空输入框逐个点击并核对文字和无自动发送；确认 Control Strip 保留；切到 Finder 确认收起；从 CTB 禁用或退出确认恢复。出现问题先禁用/退出并报告系统版本及失败步骤，不提供输入内容或个人数据。
+跨应用Touch Bar依赖私有`presentSystemModalTouchBar:systemTrayItemIdentifier:`和`dismissSystemModalTouchBar:`，旧FunctionBar名称为后备。桥接核对签名并保护Objective-C异常；无法保证硬件显示或防止全部底层崩溃。未修改系统Touch Bar偏好，不申请录屏、输入监控或Apple Events权限。
 
-## 发布范围
+参考：[NSTouchBar官方文档](https://developer.apple.com/documentation/appkit/nstouchbar)、[MTMR接口用法](https://github.com/Toxblh/MTMR/blob/master/MTMR/TouchBarController.swift)、[EnergyBar接口声明](https://github.com/billziss-gh/EnergyBar/blob/master/src/System/NSTouchBar%2BSystemModal.m)。桥接独立实现，未引入这些实现文件或依赖。
 
-仓库只包含源代码、脚本、测试和通用配置示例，不含本地构建、个人配置或调试日志。许可证尚未选择。
+仓库尚未指定LICENSE；公开可见不等于授予开源使用许可。

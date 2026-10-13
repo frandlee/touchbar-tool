@@ -4,7 +4,7 @@ var checks = 0
 func check(_ condition: @autoclosure () -> Bool, _ name: String) {
     precondition(condition(), name); checks += 1
 }
-let data = try Data(contentsOf: URL(fileURLWithPath: "config.example.json"))
+let data = try Data(contentsOf: URL(fileURLWithPath: "Tests/Fixtures/default-config.json"))
 let configuration = try JSONDecoder().decode(Configuration.self, from: data)
 try configuration.validate()
 check(configuration.schemaVersion == 2, "schema version")
@@ -42,7 +42,15 @@ check(!accepts { $0["buttons"] = Array(($0["buttons"] as! [[String: Any]]).dropL
 check(!accepts { var b = $0["buttons"] as! [[String: Any]]; b.append(b[0]); $0["buttons"] = b }, "reject extra button")
 check(!accepts { var b = $0["buttons"] as! [[String: Any]]; b[4]["id"] = "continue"; $0["buttons"] = b }, "reject duplicate ID")
 check(!accepts { var b = $0["buttons"] as! [[String: Any]]; b[4]["id"] = "unknown"; $0["buttons"] = b }, "reject unknown ID")
-check(!accepts { var b = $0["buttons"] as! [[String: Any]]; b[4]["title"] = "发送"; $0["buttons"] = b }, "reject changed label")
+check(accepts { var b = $0["buttons"] as! [[String: Any]]; b[4]["title"] = "合并上线"; $0["buttons"] = b }, "custom title accepted")
 check(accepts { $0["pasteAuthorized"] = true }, "explicitly authorized runtime config")
 check((try? JSONDecoder().decode(Configuration.self, from: Data("{broken}".utf8))) == nil, "reject malformed JSON")
+check(!accepts { $0["autoSend"] = "true" }, "reject malformed auto-send flag")
+check(!accepts { $0["sendDelayMilliseconds"] = 199 }, "reject too-short delay")
+check(!accepts { $0["sendDelayMilliseconds"] = 1501 }, "reject excessive delay")
+check(accepts { $0.removeValue(forKey: "autoSend"); $0.removeValue(forKey: "sendDelayMilliseconds") }, "old schema 2 remains paste-only")
+for title in ["", "   ", "x\n", "x\t", "x\u{2028}", String(repeating: "字", count: 21)] {
+    check(!accepts { var b = $0["buttons"] as! [[String: Any]]; b[4]["title"] = title; $0["buttons"] = b }, "invalid custom title rejected")
+}
+check(accepts { var b = $0["buttons"] as! [[String: Any]]; b[4]["title"] = String(repeating: "字", count: 20); $0["buttons"] = b }, "title length boundary")
 print("PASS: \(checks) multi-button configuration checks")

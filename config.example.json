@@ -3,10 +3,32 @@
   "targetBundleIdentifier": "com.openai.codex",
   "pasteAuthorized": false,
   "buttons": [
-    {"id": "continue", "title": "继续", "text": "继续"},
-    {"id": "check", "title": "查问题", "text": "检查当前问题，说明原因和建议的最小改动。"},
-    {"id": "translate", "title": "中日翻译", "text": "请将下面内容做中日互译，表达自然、简短："},
-    {"id": "done", "title": "DONE", "text": "DONE"},
-    {"id": "merge", "title": "合并", "text": "合并"}
-  ]
+    {
+      "id": "continue",
+      "title": "继续",
+      "text": "继续"
+    },
+    {
+      "id": "check",
+      "title": "查问题",
+      "text": "检查当前问题，说明原因和建议的最小改动。"
+    },
+    {
+      "id": "translate",
+      "title": "中日翻译",
+      "text": "请将下面内容做中日互译，表达自然、简短："
+    },
+    {
+      "id": "done",
+      "title": "DONE",
+      "text": "DONE"
+    },
+    {
+      "id": "merge",
+      "title": "合并",
+      "text": "合并"
+    }
+  ],
+  "autoSend": false,
+  "sendDelayMilliseconds": 400
 }

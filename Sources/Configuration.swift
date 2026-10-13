@@ -1,18 +1,21 @@
 import Foundation
 
-struct ButtonConfiguration: Codable {
+struct ButtonConfiguration: Codable, Equatable {
     let id: String
     let title: String
     let text: String
 }
 
-struct Configuration: Codable {
+struct Configuration: Codable, Equatable {
     static let fixedIDs = ["continue", "check", "translate", "done", "merge"]
-    static let fixedTitles = ["继续", "查问题", "中日翻译", "DONE", "合并"]
     let schemaVersion: Int
     let targetBundleIdentifier: String
     let buttons: [ButtonConfiguration]
     let pasteAuthorized: Bool
+    let autoSend: Bool?
+    let sendDelayMilliseconds: Int?
+    var shouldAutoSend: Bool { autoSend ?? false }
+    var sendDelay: TimeInterval { Double(sendDelayMilliseconds ?? 400) / 1000 }
 
     func validate() throws {
         func invalid(_ message: String) -> NSError {
@@ -23,10 +26,15 @@ struct Configuration: Codable {
         guard !targetBundleIdentifier.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               !targetBundleIdentifier.unicodeScalars.contains(where: { CharacterSet.whitespacesAndNewlines.contains($0) })
         else { throw invalid("Target bundle identifier must not be empty or contain whitespace.") }
-        guard buttons.map(\.id) == Self.fixedIDs, buttons.map(\.title) == Self.fixedTitles
-        else { throw invalid("Expected exactly five buttons in order: 继续｜查问题｜中日翻译｜DONE｜合并. IDs and titles are fixed.") }
+        guard buttons.map(\.id) == Self.fixedIDs
+        else { throw invalid("必须恰好五个按钮，ID顺序固定为 continue、check、translate、done、merge。") }
+        guard (200...1500).contains(sendDelayMilliseconds ?? 400) else { throw invalid("Send delay must be 200...1500 milliseconds.") }
         let forbidden = CharacterSet.controlCharacters.union(.newlines)
         for button in buttons {
+            guard !button.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                  button.title.count <= 20,
+                  !button.title.unicodeScalars.contains(where: { forbidden.contains($0) })
+            else { throw invalid("按钮 \(button.id) 的标题需为1～20个字符，不能只有空白、包含换行或控制字符。") }
             guard !button.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                   button.text.count <= 2000,
                   !button.text.unicodeScalars.contains(where: { forbidden.contains($0) })
