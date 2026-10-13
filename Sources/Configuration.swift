@@ -1,9 +1,49 @@
 import Foundation
 
+enum ButtonIcon: Codable, Hashable, CaseIterable {
+    case push, merge, deploy, pushMergeDeploy
+    case custom(String)
+    static let allCases: [ButtonIcon] = [.push, .merge, .deploy, .pushMergeDeploy]
+    var rawValue: String {
+        switch self {
+        case .push: return "push"
+        case .merge: return "merge"
+        case .deploy: return "deploy"
+        case .pushMergeDeploy: return "pushMergeDeploy"
+        case .custom(let id): return "custom:" + id
+        }
+    }
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let value = try container.decode(String.self)
+        if let known = Self.allCases.first(where: { $0.rawValue == value }) { self = known }
+        else if value.hasPrefix("custom:"), let uuid = UUID(uuidString: String(value.dropFirst(7))) {
+            self = .custom(uuid.uuidString)
+        } else { throw DecodingError.dataCorruptedError(in: container, debugDescription: "Unknown icon") }
+    }
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
+    var label: String {
+        switch self {
+        case .custom: return "自定义图标"
+        case .push: return "GitHub Push"
+        case .merge: return "GitHub Merge"
+        case .deploy: return "Deploy"
+        case .pushMergeDeploy: return "Push · Merge · Deploy"
+        }
+    }
+}
+
 struct ButtonConfiguration: Codable, Equatable {
     let id: String
     let title: String
     let text: String
+    let icon: ButtonIcon?
+    init(id: String, title: String, text: String, icon: ButtonIcon? = nil) {
+        self.id = id; self.title = title; self.text = text; self.icon = icon
+    }
 }
 
 struct Configuration: Codable, Equatable {
@@ -73,6 +113,9 @@ struct Configuration: Codable, Equatable {
         }
         let forbidden = CharacterSet.controlCharacters.union(.newlines)
         for button in buttons {
+            if case .custom(let id) = button.icon, UUID(uuidString: id) == nil {
+                throw invalid("Invalid custom icon identifier.")
+            }
             guard !button.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                   button.title.count <= 20,
                   !button.title.unicodeScalars.contains(where: { forbidden.contains($0) })

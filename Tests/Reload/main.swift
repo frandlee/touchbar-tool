@@ -112,3 +112,15 @@ try store.save(resized, expected: multiple) { cancellations += 1 }
 let resizedRead = try ConfigurationStore(url: url)
 check(resizedRead.current.profiles.map { $0.buttons.count } == [5, 1], "independent resized counts persisted")
 print("PASS: variable button count save")
+
+var iconButtons = reduced.buttons
+iconButtons[0] = ButtonConfiguration(id: iconButtons[0].id, title: iconButtons[0].title,
+    text: iconButtons[0].text, icon: .pushMergeDeploy)
+let iconProfile = Configuration(schemaVersion: 2, targetBundleIdentifier: reduced.targetBundleIdentifier,
+    buttons: iconButtons, pasteAuthorized: reduced.pasteAuthorized, autoSend: reduced.autoSend, sendDelayMilliseconds: 400)
+let iconDocument = Configuration.combining([draft, iconProfile])
+try store.save(iconDocument, expected: resized) { cancellations += 1 }
+let iconsRead = try ConfigurationStore(url: url)
+check(iconsRead.current.profiles[1].buttons[0].icon == .pushMergeDeploy, "icon saved per app/button")
+check(iconsRead.current.profiles[1].buttons[0].text == reduced.buttons[0].text, "icon save preserves send text")
+print("PASS: 2 icon persistence checks")

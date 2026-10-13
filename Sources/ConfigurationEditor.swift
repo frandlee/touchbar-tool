@@ -9,6 +9,9 @@ private final class ButtonConfigurationGrid: NSGridView {
 final class ConfigurationEditor: NSObject, NSWindowDelegate {
     private var window: NSWindow?
     private var titles: [NSTextField] = []
+    var manageIcons: (() -> Void)?
+    private var iconChoices: [ButtonIcon] = []
+    private var iconPickers: [NSPopUpButton] = []
     private var texts: [NSTextField] = []
     private let grid = ButtonConfigurationGrid()
     private let addButtonControl = NSButton(title: "增加按钮", target: nil, action: nil)
@@ -78,7 +81,8 @@ final class ConfigurationEditor: NSObject, NSWindowDelegate {
         root.addArrangedSubview(scroll)
         addButtonControl.target = self
         addButtonControl.action = #selector(addButton)
-        root.addArrangedSubview(addButtonControl)
+        let manage = NSButton(title: "管理图标…", target: self, action: #selector(openIconLibrary))
+        root.addArrangedSubview(NSStackView(views: [addButtonControl, manage]))
         let switches = NSStackView(views: [paste, autoSend])
         switches.spacing = 24
         root.addArrangedSubview(switches)
@@ -122,24 +126,34 @@ final class ConfigurationEditor: NSObject, NSWindowDelegate {
         }
         titles.removeAll()
         texts.removeAll()
+        iconPickers.removeAll()
+        iconChoices = ButtonIcon.allCases + IconLibrary.icons
+        for icon in buttons.compactMap(\.icon) where !iconChoices.contains(icon) { iconChoices.append(icon) }
         grid.rowSpacing = 10
         grid.columnSpacing = 12
         grid.addRow(with: [NSTextField(labelWithString: "按钮"), NSTextField(labelWithString: "显示标题"),
-                          NSTextField(labelWithString: "发送文案"), NSTextField(labelWithString: "操作")])
+                          NSTextField(labelWithString: "图标"), NSTextField(labelWithString: "发送文案"), NSTextField(labelWithString: "操作")])
         for (index, button) in buttons.enumerated() {
             let title = NSTextField(string: button.title)
             let text = NSTextField(string: button.text)
             title.setAccessibilityLabel("第\(index + 1)个按钮显示标题")
             text.setAccessibilityLabel("第\(index + 1)个按钮发送文案")
             title.widthAnchor.constraint(equalToConstant: 150).isActive = true
-            text.widthAnchor.constraint(equalToConstant: 480).isActive = true
+            text.widthAnchor.constraint(equalToConstant: 360).isActive = true
             let remove = NSButton(title: "删除", target: self, action: #selector(removeButton(_:)))
             remove.tag = index
             remove.isEnabled = buttons.count > 1
             remove.setAccessibilityLabel("删除按钮\(index + 1)")
+            let picker = NSPopUpButton()
+            picker.addItem(withTitle: "纯文字")
+            for icon in iconChoices { picker.menu?.addItem(NSMenuItem(title: IconLibrary.label(for: icon), action: nil, keyEquivalent: "")) }
+            picker.selectItem(at: button.icon.flatMap { iconChoices.firstIndex(of: $0) }.map { $0 + 1 } ?? 0)
+            picker.widthAnchor.constraint(equalToConstant: 150).isActive = true
+            picker.setAccessibilityLabel("第\(index + 1)个按钮图标")
+            iconPickers.append(picker)
             titles.append(title)
             texts.append(text)
-            grid.addRow(with: [NSTextField(labelWithString: "按钮 \(index + 1)"), title, text, remove])
+            grid.addRow(with: [NSTextField(labelWithString: "按钮 \(index + 1)"), title, picker, text, remove])
         }
         grid.layoutSubtreeIfNeeded()
         grid.setFrameSize(grid.fittingSize)
@@ -169,11 +183,33 @@ final class ConfigurationEditor: NSObject, NSWindowDelegate {
         guard window?.makeFirstResponder(nil) == true else { return }
         var buttons = drafts[selected].buttons
         for index in buttons.indices where index != sender.tag {
-            buttons[index] = ButtonConfiguration(id: buttons[index].id, title: titles[index].stringValue, text: texts[index].stringValue)
+            buttons[index] = ButtonConfiguration(id: buttons[index].id, title: titles[index].stringValue, text: texts[index].stringValue, icon: selectedIcon(at: index))
         }
         buttons.remove(at: sender.tag)
         replaceButtons(buttons)
         feedback.stringValue = "保存后生效。"
+    }
+    @objc private func openIconLibrary() { manageIcons?() }
+    var usedIcons: Set<ButtonIcon> {
+        guard window?.isVisible == true else { return [] }
+        var result = Set(drafts.flatMap { $0.buttons.compactMap(\.icon) })
+        for index in iconPickers.indices { if let icon = selectedIcon(at: index) { result.insert(icon) } }
+        return result
+    }
+    func refreshIconChoices() {
+        let selected = iconPickers.indices.map { selectedIcon(at: $0) }
+        iconChoices = ButtonIcon.allCases + IconLibrary.icons
+        for icon in selected.compactMap({ $0 }) where !iconChoices.contains(icon) { iconChoices.append(icon) }
+        for (index, picker) in iconPickers.enumerated() {
+            picker.removeAllItems()
+            picker.addItem(withTitle: "纯文字")
+            for icon in iconChoices { picker.menu?.addItem(NSMenuItem(title: IconLibrary.label(for: icon), action: nil, keyEquivalent: "")) }
+            picker.selectItem(at: selected[index].flatMap { iconChoices.firstIndex(of: $0) }.map { $0 + 1 } ?? 0)
+        }
+    }
+    private func selectedIcon(at index: Int) -> ButtonIcon? {
+        let choice = iconPickers[index].indexOfSelectedItem
+        return choice > 0 ? iconChoices[choice - 1] : nil
     }
     private func captureSelected() throws {
         guard window?.makeFirstResponder(nil) == true,
@@ -184,7 +220,7 @@ final class ConfigurationEditor: NSObject, NSWindowDelegate {
         let candidate = Configuration(schemaVersion: 2,
             targetBundleIdentifier: drafts[selected].targetBundleIdentifier,
             buttons: titles.indices.map {
-                ButtonConfiguration(id: drafts[selected].buttons[$0].id, title: titles[$0].stringValue, text: texts[$0].stringValue)
+                ButtonConfiguration(id: drafts[selected].buttons[$0].id, title: titles[$0].stringValue, text: texts[$0].stringValue, icon: selectedIcon(at: $0))
             }, pasteAuthorized: paste.state == .on, autoSend: autoSend.state == .on,
             sendDelayMilliseconds: milliseconds)
         try candidate.validate()

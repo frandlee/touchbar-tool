@@ -10,3 +10,5 @@
 *.p12
 *.pfx
 *.mobileprovision
+
+/touchbar-icons/

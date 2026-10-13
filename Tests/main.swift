@@ -89,3 +89,13 @@ check(mixedCounts.profile(for: "com.example.short")?.buttons.count == 2, "each a
 let persistedCounts = try JSONDecoder().decode(Configuration.self, from: JSONEncoder().encode(mixedCounts))
 check(persistedCounts == mixedCounts, "different button counts survive roundtrip")
 print("PASS: 7 variable button count checks")
+
+check(configuration.buttons.allSatisfy { $0.icon == nil }, "legacy buttons remain text only")
+for icon in ButtonIcon.allCases {
+    let button = ButtonConfiguration(id: "icon-test", title: "Action", text: "unchanged command", icon: icon)
+    let decoded = try JSONDecoder().decode(ButtonConfiguration.self, from: JSONEncoder().encode(button))
+    check(decoded == button, "icon option roundtrip")
+    check(decoded.text == "unchanged command", "icon does not change command")
+}
+check(!accepts { var b = $0["buttons"] as! [[String: Any]]; b[0]["icon"] = "invalid-icon"; $0["buttons"] = b }, "unknown icon rejected")
+print("PASS: 10 icon configuration compatibility checks")

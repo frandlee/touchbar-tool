@@ -1,0 +1,5 @@
+Source: GitHub Primer Octicons https://github.com/primer/octicons
+Official SVGs: icons/repo-push-24.svg, icons/git-merge-24.svg, icons/rocket-24.svg
+License: MIT; full notice in LICENSE.txt, also bundled with the application.
+PNG derivatives: 72x72 transparent images rendered from official SVGs with sharp/librsvg.
+These are action icons; no GitHub Octocat logo is included.

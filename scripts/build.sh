@@ -16,7 +16,7 @@ fi
 touchbar_cache="$PWD/build/module-cache-$(printf '%s' "$PWD" | shasum -a 256 | cut -c 1-12)"
 mkdir -p build/TouchbarTool.app/Contents/MacOS "$touchbar_cache"
 xcrun clang -fobjc-arc -fmodules -fmodules-cache-path="$touchbar_cache" -c Sources/Bridge.m -o build/Bridge.o
-xcrun swiftc -swift-version 5 -module-cache-path "$touchbar_cache" -import-objc-header Sources/Bridge.h Sources/Configuration.swift Sources/ConfigurationStore.swift Sources/ConfigurationEditor.swift Sources/ButtonTitleLayout.swift Sources/AutoSendGate.swift Sources/main.swift build/Bridge.o -framework AppKit -framework ApplicationServices -o build/TouchbarTool.app/Contents/MacOS/CodexTouchBar
+xcrun swiftc -swift-version 5 -module-cache-path "$touchbar_cache" -import-objc-header Sources/Bridge.h Sources/Configuration.swift Sources/ConfigurationStore.swift Sources/ConfigurationEditor.swift Sources/IconLibraryWindow.swift Sources/ButtonTitleLayout.swift Sources/AutoSendGate.swift Sources/main.swift build/Bridge.o -framework AppKit -framework ApplicationServices -o build/TouchbarTool.app/Contents/MacOS/CodexTouchBar
 cat > build/TouchbarTool.app/Contents/Info.plist <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -26,8 +26,8 @@ cat > build/TouchbarTool.app/Contents/Info.plist <<'PLIST'
 <key>CFBundleDisplayName</key><string>Touchbar Tool</string>
 <key>CFBundleExecutable</key><string>CodexTouchBar</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleVersion</key><string>15</string>
-<key>CFBundleShortVersionString</key><string>0.8.3</string>
+<key>CFBundleVersion</key><string>16</string>
+<key>CFBundleShortVersionString</key><string>0.9.0</string>
 <key>LSUIElement</key><true/>
 <key>CFBundleIconFile</key><string>AppIcon</string>
 <key>NSHighResolutionCapable</key><true/>
@@ -41,6 +41,8 @@ if [[ ! -f build/config.json ]]; then
 fi
 mkdir -p build/TouchbarTool.app/Contents/Resources
 cp Assets/AppIcon.icns build/TouchbarTool.app/Contents/Resources/AppIcon.icns
+mkdir -p build/TouchbarTool.app/Contents/Resources/Octicons
+cp Assets/Octicons/*.png Assets/Octicons/LICENSE.txt build/TouchbarTool.app/Contents/Resources/Octicons/
 codesign --force --sign "$touchbar_signing_identity" build/TouchbarTool.app
 codesign --verify --strict build/TouchbarTool.app
 echo "Built $PWD/build/TouchbarTool.app"

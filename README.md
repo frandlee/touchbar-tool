@@ -1,4 +1,4 @@
-# Touchbar Tool 0.8.3
+# Touchbar Tool 0.9.0
 
 轻量 Swift/AppKit 菜单栏 Touch Bar 工具。在指定应用处于前台时显示五个按钮，切换应用后收起，并保留 Control Strip。目标默认 bundle ID 为 `com.openai.codex`，只能按应用匹配，不能区分应用内的模式。
 
@@ -110,3 +110,12 @@ open build/TouchbarTool.app --args --diagnostics
 ## 0.8.3 纯菜单栏模式
 
 默认不显示Dock，保留正式应用图标和完整配置窗口。普通启动或重新打开App显示配置；关闭窗口后继续运行，顶部菜单退出才结束工具。登录项--background保持后台启动。菜单栏Touch Bar图标、按钮配置、发送保护和稳定证书签名保持不变。
+
+
+## 0.9.0 图标与图标库
+
+每行按钮可选择纯文字、GitHub Push/Merge、Deploy或三者组合，以及导入的自定义图标。选择图标仅改变外观；标题保留为辅助功能名，发送文案及自动回车设置独立。旧配置icon缺省为纯文字，缺失自定义文件回退文字并保留引用。
+
+顶部菜单及配置窗口提供“管理图标”：所有应用共享本机库，PNG/JPEG多选导入（5MB限制、等比128px PNG）、预览、重命名、移到废纸篓。内置图标只读，已保存配置或可见草稿使用的图标不能删除。个人图标库位于运行配置旁touchbar-icons目录，不上传云端并被Git忽略。备份或迁移个人配置时也需保留该目录。
+
+内置图标来自[GitHub Primer Octicons](https://github.com/primer/octicons)，MIT许可全文和来源位于Assets/Octicons，许可随App打包；未使用Octocat品牌标志。SVG预先转换为PNG，无新增运行/构建第三方依赖。221项检查通过，隔离窗口验证导入、重命名、选择器同步和在用图标删除保护。

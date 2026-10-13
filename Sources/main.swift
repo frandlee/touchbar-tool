@@ -30,6 +30,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate {
     private var config: Configuration!
     private var configurationStore: ConfigurationStore!
     private var configurationEditor: ConfigurationEditor?
+    private let iconLibraryWindow = IconLibraryWindow()
     private var configurationInfo: NSMenuItem?
     private var configurationOutcome = "Loaded at startup"
     private var configurationRevision = 1
@@ -67,6 +68,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate {
                 ?? Bundle.main.bundleURL.deletingLastPathComponent().appendingPathComponent("config.json")
             configurationStore = try ConfigurationStore(url: url)
             config = configurationStore.current
+            IconLibrary.directory = url.deletingLastPathComponent().appendingPathComponent("touchbar-icons")
         } catch { fail("Configuration error: \(error.localizedDescription)"); return }
         guard CTBAvailable() else { fail("Private Touch Bar API unavailable; exiting safely."); return }
         status = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -82,6 +84,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate {
         edit.target = self; menu.addItem(edit)
         let reload = NSMenuItem(title: "重新加载配置", action: #selector(reloadConfiguration), keyEquivalent: "")
         reload.target = self; menu.addItem(reload)
+        let icons = NSMenuItem(title: "管理图标", action: #selector(manageIconLibrary), keyEquivalent: "")
+        icons.target = self; menu.addItem(icons)
         menu.addItem(.separator())
         let quit = NSMenuItem(title: "退出 Touchbar Tool", action: #selector(quitApp), keyEquivalent: "q")
         quit.target = self; menu.addItem(quit); status.menu = menu
@@ -191,6 +195,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate {
         if configurationEditor == nil {
             configurationEditor = ConfigurationEditor()
         }
+        configurationEditor?.manageIcons = { [weak self] in self?.manageIconLibrary() }
         configurationEditor?.present(configuration: configurationStore.current) { [weak self] candidate, expected in
             guard let self else { return }
             try self.configurationStore.save(candidate, expected: expected) {
@@ -200,6 +205,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate {
         }
     }
 
+    @objc private func manageIconLibrary() {
+        cancelAutoSend("Cancelled: manage icons")
+        iconLibraryWindow.usedIcons = { [weak self] in
+            guard let self else { return [] }
+            return Set(self.configurationStore.current.profiles.flatMap { $0.buttons.compactMap(\.icon) })
+                .union(self.configurationEditor?.usedIcons ?? [])
+        }
+        iconLibraryWindow.didChange = { [weak self] in self?.configurationEditor?.refreshIconChoices() }
+        iconLibraryWindow.present()
+    }
     @objc private func reloadConfiguration() {
         do {
             let candidate = try configurationStore.reload { self.cancelAutoSend("Cancelled: configuration reload") }
@@ -225,7 +240,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate {
         for (index, identifier) in itemIDs.enumerated() {
             if let item = bar.item(forIdentifier: identifier) as? NSCustomTouchBarItem,
                let button = item.view as? NSButton {
-                applyButtonTitle(config.buttons[index].title, to: button, identifier: identifier)
+                applyButtonTitle(config.buttons[index].title, icon: config.buttons[index].icon, to: button, identifier: identifier)
                 button.isEnabled = config.pasteAuthorized
             }
         }
@@ -281,17 +296,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate {
         let item = NSCustomTouchBarItem(identifier: identifier)
         let button = NSButton(title: config.buttons[index].title, target: self, action: #selector(pasteButton(_:)))
         button.tag = index
-        applyButtonTitle(config.buttons[index].title, to: button, identifier: identifier)
+        applyButtonTitle(config.buttons[index].title, icon: config.buttons[index].icon, to: button, identifier: identifier)
         button.isEnabled = config.pasteAuthorized
         item.view = button
         return item
     }
-    private func applyButtonTitle(_ title: String, to button: NSButton, identifier: NSTouchBarItem.Identifier) {
+    private func applyButtonTitle(_ title: String, icon: ButtonIcon?, to button: NSButton, identifier: NSTouchBarItem.Identifier) {
         button.title = title
+        button.image = ButtonIconImage.image(for: icon)
+        button.imagePosition = button.image == nil ? .noImage : .imageOnly
         button.font = .systemFont(ofSize: 13)
         button.cell?.lineBreakMode = .byTruncatingTail
         button.setAccessibilityLabel(title)
-        let width = ButtonTitleLayout.width(for: title)
+        let width = button.image.map { max(64, $0.size.width + 24) } ?? ButtonTitleLayout.width(for: title)
         if let constraint = titleWidths[identifier] { constraint.constant = width }
         else {
             let constraint = button.widthAnchor.constraint(equalToConstant: width)
