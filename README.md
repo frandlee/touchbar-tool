@@ -21,7 +21,7 @@ codesign --verify --strict build/TouchbarTool.app
 open build/TouchbarTool.app
 ```
 
-输出为`build/TouchbarTool.app`，版本0.6.0（build 8）。内部可执行文件`CodexTouchBar`，bundle ID `local.codex-touchbar.prototype`，使用ad-hoc签名。构建首次从通用示例生成根目录个人配置，仅在运行配置不存在时复制到`build/config.json`，不会覆盖已有运行配置。
+输出为`build/TouchbarTool.app`，版本0.6.1（build 9）。内部可执行文件`CodexTouchBar`，bundle ID `local.codex-touchbar.prototype`，使用ad-hoc签名。构建首次从通用示例生成根目录个人配置，仅在运行配置不存在时复制到`build/config.json`，不会覆盖已有运行配置。
 
 GUI默认读取`build/config.json`；启动时设置`CODEX_TOUCHBAR_CONFIG`可指定其他文件，编辑和重载始终使用该次启动确定的路径。CTB → **重新加载配置** 可加载外部文件修改；失败时保留旧配置。编辑、保存、重载均取消待发送任务，旧任务不会复活。
 
@@ -58,7 +58,7 @@ open build/TouchbarTool.app --args --diagnostics
 
 ## 验证与兼容性
 
-191项检查：52项配置与应用匹配、97项自动发送保护/离屏输入模拟、38项重载及保存保护、4项标题布局。0.6.0构建及严格签名检查通过，表格窗口布局和字段已核实；该版本真实目标发送未重新验收。较早版本自动回车已由用户实机确认，不能视为所有系统和应用兼容保证。
+191项检查：52项配置与应用匹配、97项自动发送保护/离屏输入模拟、38项重载及保存保护、4项标题布局。0.6.1构建及严格签名检查通过，表格窗口布局和字段已核实；该版本真实目标发送未重新验收。较早版本自动回车已由用户实机确认，不能视为所有系统和应用兼容保证。
 
 跨应用Touch Bar依赖私有`presentSystemModalTouchBar:systemTrayItemIdentifier:`和`dismissSystemModalTouchBar:`，旧FunctionBar名称为后备。桥接核对签名并保护Objective-C异常；无法保证硬件显示或防止全部底层崩溃。未修改系统Touch Bar偏好，不申请录屏、输入监控或Apple Events权限。
 
