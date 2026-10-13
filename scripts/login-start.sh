@@ -15,7 +15,7 @@ import plistlib, sys
 from pathlib import Path
 path, app, label = sys.argv[1:]
 with Path(path).open('xb') as stream:
-    plistlib.dump({'Label': label, 'ProgramArguments': ['/usr/bin/open', '-g', app],
+    plistlib.dump({'Label': label, 'ProgramArguments': ['/usr/bin/open', '-g', app, '--args', '--background'],
                   'RunAtLoad': True, 'LimitLoadToSessionType': 'Aqua'}, stream)
 Path(path).chmod(0o644)
 PY

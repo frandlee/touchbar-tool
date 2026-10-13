@@ -14,9 +14,10 @@ cat > build/TouchbarTool.app/Contents/Info.plist <<'PLIST'
 <key>CFBundleDisplayName</key><string>Touchbar Tool</string>
 <key>CFBundleExecutable</key><string>CodexTouchBar</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleVersion</key><string>11</string>
-<key>CFBundleShortVersionString</key><string>0.7.1</string>
-<key>LSUIElement</key><true/>
+<key>CFBundleVersion</key><string>12</string>
+<key>CFBundleShortVersionString</key><string>0.8.0</string>
+<key>LSUIElement</key><false/>
+<key>CFBundleIconFile</key><string>AppIcon</string>
 <key>NSHighResolutionCapable</key><true/>
 </dict></plist>
 PLIST
@@ -26,5 +27,7 @@ fi
 if [[ ! -f build/config.json ]]; then
   cp config.json build/config.json
 fi
+mkdir -p build/TouchbarTool.app/Contents/Resources
+cp Assets/AppIcon.icns build/TouchbarTool.app/Contents/Resources/AppIcon.icns
 codesign --force --sign - build/TouchbarTool.app
 echo "Built $PWD/build/TouchbarTool.app"

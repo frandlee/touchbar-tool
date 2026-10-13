@@ -92,7 +92,44 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate {
         // Recheck after wake and recover missed activation notifications.
         timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in self?.update() }
         update()
+        configureApplicationMenu()
         if CommandLine.arguments.contains("--diagnostics") { showDiagnostics() }
+        else if !CommandLine.arguments.contains("--background") { editConfiguration() }
+
+    }
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        editConfiguration()
+        return false
+    }
+    private func configureApplicationMenu() {
+        let main = NSMenu()
+        let applicationItem = NSMenuItem()
+        main.addItem(applicationItem)
+        let applicationMenu = NSMenu(title: "Touchbar Tool")
+        let settings = NSMenuItem(title: "Edit Configuration…", action: #selector(editConfiguration), keyEquivalent: ",")
+        settings.target = self
+        applicationMenu.addItem(settings)
+        applicationMenu.addItem(.separator())
+        let quit = NSMenuItem(title: "Quit Touchbar Tool", action: #selector(quitApp), keyEquivalent: "q")
+        quit.target = self
+        applicationMenu.addItem(quit)
+        applicationItem.submenu = applicationMenu
+        let editItem = NSMenuItem()
+        main.addItem(editItem)
+        let editMenu = NSMenu(title: "Edit")
+        editMenu.addItem(withTitle: "Undo", action: Selector(("undo:")), keyEquivalent: "z")
+        editMenu.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        editMenu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        editMenu.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        editMenu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        editItem.submenu = editMenu
+        let windowItem = NSMenuItem()
+        main.addItem(windowItem)
+        let windowMenu = NSMenu(title: "Window")
+        windowMenu.addItem(withTitle: "Close", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+        windowItem.submenu = windowMenu
+        NSApp.mainMenu = main
+        NSApp.windowsMenu = windowMenu
     }
     private func showDiagnostics() {
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 620, height: 240),
@@ -249,8 +286,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate {
     }
     private func applyButtonTitle(_ title: String, to button: NSButton, identifier: NSTouchBarItem.Identifier) {
         button.title = title
-        button.image = ButtonTitleLayout.icon(for: title)
-        button.imagePosition = button.image == nil ? .noImage : .imageOnly
         button.font = .systemFont(ofSize: 13)
         button.cell?.lineBreakMode = .byTruncatingTail
         button.setAccessibilityLabel(title)
@@ -475,7 +510,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate {
 }
 
 let app = NSApplication.shared
-app.setActivationPolicy(.accessory)
+app.setActivationPolicy(.regular)
 let delegate = AppDelegate()
 app.delegate = delegate
 app.run()

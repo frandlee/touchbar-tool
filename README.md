@@ -1,4 +1,4 @@
-# Touchbar Tool 0.7.1
+# Touchbar Tool 0.8.0
 
 轻量 Swift/AppKit 菜单栏 Touch Bar 工具。在指定应用处于前台时显示五个按钮，切换应用后收起，并保留 Control Strip。目标默认 bundle ID 为 `com.openai.codex`，只能按应用匹配，不能区分应用内的模式。
 
@@ -21,7 +21,7 @@ codesign --verify --strict build/TouchbarTool.app
 open build/TouchbarTool.app
 ```
 
-输出为`build/TouchbarTool.app`，版本0.7.0（build 10）。内部可执行文件`CodexTouchBar`，bundle ID `local.codex-touchbar.prototype`，使用ad-hoc签名。构建首次从通用示例生成根目录个人配置，仅在运行配置不存在时复制到`build/config.json`，不会覆盖已有运行配置。
+输出为`build/TouchbarTool.app`，版本0.7.0（build 12）。内部可执行文件`CodexTouchBar`，bundle ID `local.codex-touchbar.prototype`，使用ad-hoc签名。构建首次从通用示例生成根目录个人配置，仅在运行配置不存在时复制到`build/config.json`，不会覆盖已有运行配置。
 
 GUI默认读取`build/config.json`；启动时设置`CODEX_TOUCHBAR_CONFIG`可指定其他文件，编辑和重载始终使用该次启动确定的路径。CTB → **重新加载配置** 可加载外部文件修改；失败时保留旧配置。编辑、保存、重载均取消待发送任务，旧任务不会复活。
 
@@ -84,6 +84,12 @@ open build/TouchbarTool.app --args --diagnostics
 编辑窗口提供“增加按钮”及每行“删除”，表格可滚动。按钮顺序由配置列表决定，删除中间行保留其余按钮ID及文案。保存后取消旧发送任务并重建Touch Bar，避免旧缓存错用位置。旧配置兼容，新增按钮为占位标题和文案，可编辑后保存。
 
 
-## 0.7.1 中日翻译图标
+## 0.8.0 完整应用入口
 
-标题为“中日翻译”的按钮显示“中⇄日”模板图标，适应系统色彩，保留辅助功能名称。标题改为其他文字后恢复文字显示；发送文案和自动回车设置不变。
+保留菜单栏CTB控制入口，并支持Dock应用图标。普通启动默认打开配置窗口，关闭窗口不退出工具；点击Dock或重新打开App恢复配置窗口。标准菜单支持编辑配置、剪切/复制/粘贴、关闭窗口和退出。
+
+应用图标为银色MacBook铝合金背景、黑色贯穿Touch Bar、彩色小符号，Assets/AppIcon.png和AppIcon.icns由内置imagegen生成，最终提示词见Assets/AppIcon.prompt.txt。构建将.icns打包到Resources并声明CFBundleIconFile。
+
+显示标题直接支持“中⇄日”等Unicode文字，不再根据“中日翻译”标题自动替换图像。发送文案与显示标题独立，行为不变。
+
+新登录启动项使用--background保持后台启动。已有登录项应先disable再enable更新参数，不终止运行App。默认菜单栏＋Dock模式保留原bundle ID及配置路径，升级前退出并保留个人配置。
