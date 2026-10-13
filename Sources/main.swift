@@ -512,7 +512,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate {
 }
 
 let app = NSApplication.shared
-app.setActivationPolicy(.regular)
+app.setActivationPolicy(.accessory)
 let delegate = AppDelegate()
 app.delegate = delegate
 app.run()

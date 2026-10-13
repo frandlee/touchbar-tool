@@ -1,4 +1,4 @@
-# Touchbar Tool 0.8.2
+# Touchbar Tool 0.8.3
 
 轻量 Swift/AppKit 菜单栏 Touch Bar 工具。在指定应用处于前台时显示五个按钮，切换应用后收起，并保留 Control Strip。目标默认 bundle ID 为 `com.openai.codex`，只能按应用匹配，不能区分应用内的模式。
 
@@ -105,3 +105,8 @@ open build/TouchbarTool.app --args --diagnostics
 构建默认复用钥匙串唯一有效代码签名身份，以稳定的designated requirement识别更新后的App。没有身份或存在多个身份时在编译前停止，请设置TOUCHBAR_SIGNING_IDENTITY为所选有效身份名称/哈希。显式TOUCHBAR_SIGNING_IDENTITY=-可生成ad-hoc构建，但更新可能使隐私授权失配；不会静默回退。签名后自动执行严格验证。
 
 从ad-hoc首次切换证书时可能需要重新授权一次；随后保持同一证书身份及bundle ID更新通常可沿用权限。两份不同二进制的证书签名规则一致已验证，未来真实更新后仍应核实GUI权限。Apple Development用于本机开发，不代表应用已公证或可免提示公开分发；此仓库发布源码，未发布证书或私钥。
+
+
+## 0.8.3 纯菜单栏模式
+
+默认不显示Dock，保留正式应用图标和完整配置窗口。普通启动或重新打开App显示配置；关闭窗口后继续运行，顶部菜单退出才结束工具。登录项--background保持后台启动。菜单栏Touch Bar图标、按钮配置、发送保护和稳定证书签名保持不变。
